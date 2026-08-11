@@ -145,9 +145,10 @@ input:focus{border-color:var(--gold);}
 .card.sel{transform:translateY(-16px);box-shadow:0 0 10px var(--gold);border-color:var(--gold);}
 .card.red{color:var(--red);}
 .card .cr{position:absolute;top:5px;left:7px;font-weight:800;font-size:16px;}
-.card .cs{position:absolute;bottom:4px;right:7px;font-size:22px;}
+.card .cs{position:absolute;top:28px;left:7px;font-size:22px;}
 
 .controls{display:flex;gap:10px;justify-content:center;padding:12px 0 4px;flex-wrap:wrap;}
+.controls [data-act="play"]{order:10;margin-left:auto;}
 
 /* ---------- 日志 ---------- */
 .logbox{margin-top:16px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.1);
@@ -201,7 +202,7 @@ td.minus{color:#ff8d8d;font-weight:700;}
   .table-rank{left:5px;top:3px;font-size:13px;}
   .table-suit{right:5px;bottom:3px;font-size:17px;}
   .card{width:44px;height:64px;margin-left:-14px;}
-  .card .cs{font-size:17px;}
+  .card .cs{top:22px;left:5px;font-size:17px;}
   .card .cr{font-size:13px;}
   .secret,.hand,.controls{width:100%;max-width:calc(100vw - 16px);}
   .secret{white-space:normal;overflow-wrap:anywhere;line-height:1.5;}

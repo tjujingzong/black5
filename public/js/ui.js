@@ -74,7 +74,6 @@ function handleAct(act) {
     case 'next': send({ t: 'next' }); break;
     case 'lobby': send({ t: 'toLobby' }); break;
     case 'reveal': send({ t: 'reveal' }); break;
-    case 'pass': send({ t: 'pass' }); break;
     case 'hint': {
       const myTurn = v.phase === 'playing' && v.turnSeat === v.mySeat;
       if (!myTurn) return toast('还没轮到你出牌');
@@ -83,12 +82,19 @@ function handleAct(act) {
         selected.clear();
         hint.forEach(c => selected.add(c.id));
         render(v);
-      } else toast('没有能压过的牌，只能选择"不出"');
+      } else toast('没有能压过的牌，请点“过牌”');
       break;
     }
     case 'play': {
       const cards = v.myHand.filter(c => selected.has(c.id));
-      if (!cards.length) return toast('请先选择要出的牌');
+      if (!cards.length) {
+        const myTurn = v.phase === 'playing' && v.turnSeat === v.mySeat;
+        if (myTurn && v.pending) {
+          send({ t: 'pass' });
+          return;
+        }
+        return toast('请先选择要出的牌');
+      }
       const combo = classify(cards);
       if (!combo) return toast('不是合法牌型');
       if (v.pending && v.pending.seat !== v.mySeat && !canBeat(combo, v.pending.combo)) {
@@ -182,6 +188,7 @@ function gameHtml(v) {
     </div>`).join('');
 
   const canPass = myTurn && !!v.pending;
+  const playLabel = selected.size > 0 ? '出牌' : canPass ? '过牌' : '出牌';
   const status = v.phase !== 'playing' ? '本局已结束' : myTurn ? '轮到你出牌' : `等待 ${seatName(v.turnSeat)} 出牌`;
 
   return `<div class="game">
@@ -204,9 +211,8 @@ function gameHtml(v) {
       <div class="hand">${hand}</div>
       <div class="controls">
         <button data-act="hint" ${myTurn ? '' : 'disabled'}>提示</button>
-        <button class="primary" data-act="play" ${myTurn ? '' : 'disabled'}>出牌</button>
-        <button data-act="pass" ${canPass ? '' : 'disabled'}>不出</button>
         ${v.canReveal ? '<button class="accent" data-act="reveal">明牌：我是黑五</button>' : ''}
+        <button class="primary" data-act="play" ${myTurn ? '' : 'disabled'}>${playLabel}</button>
       </div>
     </div>
   </div>`;
