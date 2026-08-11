@@ -83,7 +83,6 @@ input:focus{border-color:var(--gold);}
 .tag.dealer{background:#c9962c;color:#231a05;}
 .tag.b5{background:#111;border:1px solid #888;color:#fff;}
 .tag.solo{background:#7c3aed;color:#fff;}
-.tag.voice{background:#0a7d4f;color:#fff;}
 .meta{display:block;font-size:12px;opacity:.85;margin-top:3px;}
 .meta.finish{color:var(--gold);font-weight:700;}
 .off-tag{color:#ff9d5c;}

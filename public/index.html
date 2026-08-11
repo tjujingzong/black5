@@ -3,16 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>挤黑五 · P2P 在线联机</title>
+<title>挤黑五 · 在线联机</title>
 <link rel="stylesheet" href="css/style.css">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
 
 <!-- 首页：创建 / 加入房间 -->
 <section id="screen-home" class="screen home">
   <h1>挤黑五</h1>
-  <p class="sub">P2P 在线联机 · 无需服务器 · 房主浏览器即主机</p>
+  <p class="sub">Cloudflare 实时联机 · 服务端规则校验 · 断线自动恢复</p>
   <div class="home-card">
     <input id="inp-name" maxlength="8" placeholder="输入你的昵称" autocomplete="off">
     <button id="btn-create" class="primary big">创建房间</button>
@@ -40,10 +39,7 @@
     <div class="rc">房间 <b id="room-code"></b>
       <button id="btn-copy" class="mini">复制邀请链接</button>
     </div>
-    <div class="rc">
-      <button id="btn-voice" class="mini">🎤 开语音</button>
-      <button id="btn-leave" class="mini">离开房间</button>
-    </div>
+    <div class="rc"><button id="btn-leave" class="mini">离开房间</button></div>
   </header>
   <div id="room-body"></div>
 </section>

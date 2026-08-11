@@ -1,102 +1,75 @@
-# 挤黑五 · P2P 在线联机
+# 挤黑五 · Cloudflare 在线联机
 
-零后端、零成本的多人在线卡牌游戏「挤黑五」。纯静态页面即可部署到 GitHub Pages，
-游戏逻辑跑在**房主的浏览器**里，联机与语音全部走 **PeerJS（WebRTC）** 点对点传输。
+多人在线卡牌游戏“挤黑五”。前端静态资源、HTTP API 和 WebSocket 统一部署到
+Cloudflare Workers；每个房间由一个 SQLite-backed Durable Object 承载权威游戏状态。
 
-## 特性
+## 架构
 
-- 🃏 完整挤黑五规则：发牌、逆时针出牌、牌型压制、黑五身份隐蔽、明牌、独庄、名次计分
-- 👥 支持 3~6 人（推荐 5 人），发牌数量自动适配（5 人局为 11/11/10/10/10）
-- 🎤 实时语音：开语音的玩家之间 WebRTC 点对点直连，音频不经服务器
-- 🔗 房间号 / 邀请链接（`?room=XXXXX`）一键加入，掉线自动重连并恢复座位
-- 💸 零成本：GitHub Pages 托管静态页面 + PeerJS 公共云做信令，不写一行后端代码
-
-## 游戏规则
-
-| 项目 | 说明 |
-| --- | --- |
-| 牌 | 一副标准扑克去掉大小王，共 52 张；点数 3~A~2（2 最大，且不入顺子/连对） |
-| 发牌 | 从庄家起逆时针轮发：5 人局庄家与下家各 11 张，其余各 10 张；其他人数自动分配 |
-| 阵营 | 庄家 vs 闲家；持有**黑桃5**的玩家是庄家的秘密队友（黑五），开局互不知晓 |
-| 独庄 | 庄家自己摸到黑桃5，独自对抗所有闲家，结算分数 ×2 |
-| 牌型 | 单张 / 对子 / 3 张以上顺子 / 连对 / 三张（炸弹）/ 四张（轰牌） |
-| 压牌 | 同牌型同长度比点数，或直接用炸弹；轰牌 > 炸弹 > 普通牌型 |
-| 明牌 | 黑五可随时亮出身份；黑桃5 被打出时身份自动公开 |
-| 胜负 | 头科（第一个出完手牌）所在阵营获胜；继续决出全部名次计分 |
-| 计分 | 名次基础分等差展开（5 人局：头科 +10 / 二科 +5 / 三科 0 / 四科 −5 / 大落 −10），同阵营同进退 |
-| 轮庄 | 每局结束庄家自动轮替到下家 |
-
-## 技术架构
-
-```
-┌──────────────┐   PeerJS 公共云（信令）   ┌──────────────┐
-│  客人浏览器   │ ◄──────────────────────► │  房主浏览器   │
-│  渲染 + 操作  │   WebRTC 数据通道（状态） │  游戏状态机   │
-└──────┬───────┘                          └──────────────┘
-       │         WebRTC 音频（语音全 mesh 直连）        │
-       └───────────────────────────────────────────────┘
-静态页面托管：GitHub Pages
+```text
+浏览器 ── HTTPS / WebSocket ──> Cloudflare Worker
+                                      │
+                                      └── Room Durable Object
+                                          ├── 玩家连接与断线恢复
+                                          ├── 权威规则校验
+                                          ├── 个性化状态广播
+                                          └── SQLite 状态持久化
 ```
 
-- **房主即服务器**：权威游戏逻辑（`js/engine.js`）在房主浏览器运行，向每位客人下发
-  "战争迷雾"视图（只包含该玩家应看到的信息）
-- **信令免费**：PeerJS 公共云仅用于握手，游戏数据与语音走点对点通道
-- **语音 mesh**：开语音的玩家两两建立 WebRTC 通话；按玩家令牌字典序确定主叫方，
-  避免重复呼叫；成员进出自动增删通话
+- 房主关闭浏览器不会导致服务端消失；大厅中房主离开后，下一位玩家自动成为房主。
+- 浏览器只发送动作，手牌、回合与计分均由服务端校验。
+- 每位玩家只收到自己有权查看的手牌和隐藏身份信息。
+- 房间无连接 6 小时后自动清理。
+- 彻底移除 PeerJS/WebRTC 依赖；当前版本不提供实时语音。
 
 ## 项目结构
 
-```
-index.html              页面骨架
-css/style.css           样式
-js/cards.js             牌库定义（52 张、花色、点数）
-js/rules.js             牌型判定 / 比大小 / 出牌提示
-js/engine.js            游戏状态机（房主侧权威逻辑）
-js/net.js               PeerJS 房主/客人网络层
-js/voice.js             WebRTC 语音管理
-js/ui.js                视图渲染与交互
-js/main.js              入口装配
-test.mjs                Node 冒烟测试（规则 + 整局 bot 模拟）
-.github/workflows/      GitHub Pages 自动部署
+```text
+public/                 浏览器静态资源
+  index.html
+  css/style.css
+  js/
+    main.js             页面入口与断线重连
+    net.js              Cloudflare WebSocket 客户端
+    engine.js           权威游戏状态机（Worker 与测试共用）
+    rules.js            牌型与比较规则
+    cards.js            牌库定义
+    ui.js               页面渲染
+worker/index.js         Worker 路由与 Room Durable Object
+wrangler.jsonc          Cloudflare 配置与 Durable Object 迁移
+test.mjs                规则和完整对局测试
+docs/cloudflare-deploy.md  注册与部署教程
 ```
 
-## 本地运行
+## 本地开发
 
-ES Module 需要 HTTP 环境（不能直接双击打开 html）：
+需要 Node.js 22 或更高版本：
 
 ```bash
-python3 -m http.server 8066
-# 浏览器打开 http://localhost:8066
+npm install
+npm run dev
 ```
 
-跑规则测试：`node test.mjs`
+打开 Wrangler 输出的本地地址，通常是 `http://localhost:8787`。
 
-## 部署到 GitHub Pages
+运行测试和部署前检查：
 
-已内置 Actions 工作流（`.github/workflows/pages.yml`），推送即部署：
+```bash
+npm test
+npm run check
+```
 
-1. 在 GitHub 创建空仓库，推送代码：
-   ```bash
-   git add . && git commit -m "挤黑五 P2P 联机"
-   git remote add origin git@github.com:<用户名>/<仓库名>.git
-   git push -u origin main
-   ```
-2. 仓库 **Settings → Pages → Source 选 "GitHub Actions"**
-3. 等待 Actions 跑完，访问 `https://<用户名>.github.io/<仓库名>/`
+## 部署
 
-> 也可不用 Actions：Pages Source 选 "Deploy from a branch" → `main` / `/ (root)`。
-> 所有资源均为相对路径，部署在任意子路径下都能正常工作。
+```bash
+npx wrangler login
+npm run deploy
+```
 
-## 语音使用说明
+完整的 Cloudflare 免费账户注册、首次发布、验证和自定义域名步骤见
+[`docs/cloudflare-deploy.md`](docs/cloudflare-deploy.md)。
 
-- 点击页面右上角 **🎤 开语音**，授权麦克风后即可与房间内同样开了语音的玩家实时通话
-- 开了语音的玩家头像旁会显示 🎤 标记；随时可点 **🔇 关语音** 退出
-- 需要 **HTTPS 或 localhost** 环境（GitHub Pages 天然满足），首次使用需授权麦克风权限
-- 音频为 WebRTC P2P 直连，默认仅配置公共 STUN 服务器；个别严格 NAT 环境下可能无法连通
+## 免费额度说明
 
-## 已知限制
-
-- 房主关闭页面房间即解散（房主 = 服务器），请房主保持页面开启
-- 使用 PeerJS 公共云服务，高峰期信令偶有延迟；客人断线会自动重连 3 次
-- 无房主迁移：房主掉线后需重新创建房间
-- 计分采用"阵营总分同进退"规则，独庄翻倍
+本项目使用 Workers Free 的 Workers、Static Assets 和 SQLite-backed Durable Objects。
+免费额度会调整，部署前应以 Cloudflare 官方控制台和定价页面为准。小规模朋友联机时，
+房间动作量通常远低于免费额度。免费额度耗尽后，免费计划会拒绝后续操作，不会自动扣费。

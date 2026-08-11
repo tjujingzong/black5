@@ -1,7 +1,7 @@
 // Node 冒烟测试：牌型规则 + 5 人完整对局模拟（bot 自动打完）
-import { Game } from './js/engine.js';
-import { classify, canBeat, findHint } from './js/rules.js';
-import { BLACK5_ID } from './js/cards.js';
+import { Game } from './public/js/engine.js';
+import { classify, canBeat, findHint } from './public/js/rules.js';
+import { BLACK5_ID } from './public/js/cards.js';
 
 let failed = 0;
 function ok(cond, msg) {

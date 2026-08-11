@@ -1,9 +1,9 @@
-// 界面渲染：完全由房主下发的"视图"驱动，房主与客人共用一套渲染
+// 界面渲染：完全由 Cloudflare 房间服务下发的玩家视图驱动。
 import { classify, canBeat, findHint, posName } from './rules.js';
 import { SUITS, rankChar } from './cards.js';
 
 let cur = null;          // 当前视图
-let send = () => {};     // 发送动作（房主直通 engine，客人走 PeerJS）
+let send = () => {};     // 通过 WebSocket 向权威房间服务发送动作
 let roomCode = '';
 const selected = new Set(); // 选中的手牌 id
 
@@ -195,7 +195,6 @@ function chipHtml(v, p) {
   if (p.isDealer) tags += '<i class="tag dealer">庄</i>';
   if (p.isBlackFive) tags += '<i class="tag b5">黑五</i>';
   if (v.publicSolo && p.isDealer) tags += '<i class="tag solo">独庄</i>';
-  if (p.voice) tags += '<i class="tag voice">🎤</i>';
   const meta = p.outRank
     ? `<span class="meta finish">${posName(p.outRank, v.n)}</span>`
     : `<span class="meta">${p.count} 张</span>`;

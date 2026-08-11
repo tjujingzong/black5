@@ -1,4 +1,4 @@
-// 游戏状态机（仅在房主浏览器运行，权威逻辑）
+// 权威游戏状态机：浏览器测试与 Cloudflare Durable Object 共用。
 // 规则要点：
 // - 52 张牌按逆时针从庄家开始轮发 → 5 人时庄家与下家各 11 张、其余各 10 张，人数不同自动适配
 // - 黑桃5 持有者为庄家的秘密队友（黑五）；庄家自持黑桃5 为独庄
@@ -10,9 +10,11 @@ import { classify, canBeat, comboName, posName } from './rules.js';
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 6;
 
-let seq = 0;
 function genToken() {
-  return 'p' + Date.now().toString(36) + '-' + (seq++) + '-' + Math.random().toString(36).slice(2, 8);
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return 'p-' + globalThis.crypto.randomUUID();
+  }
+  return 'p-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
 }
 
 export class Game {
@@ -32,7 +34,6 @@ export class Game {
     this.lastActions = {};    // 本圈内每位玩家的最后动作（用于桌面展示）
     this.result = null;
     this.log = [];
-    this.hostPeerId = null; // 房主的 Peer ID，由网络层在 peer open 后写入
   }
 
   pushLog(msg) {
@@ -42,20 +43,19 @@ export class Game {
 
   /* ---------------- 房间管理 ---------------- */
 
-  join(name, token, peerId) {
+  join(name, token) {
     name = String(name || '').trim().slice(0, 8) || '玩家';
     if (token) { // 断线重连：凭令牌找回座位
       const p = this.players.find(x => x.id === token);
       if (p) {
         p.connected = true;
-        if (peerId) p.peerId = peerId; // 重连后 Peer ID 会变化
         this.pushLog(`${p.name} 重新连接`);
         return { player: p };
       }
     }
     if (this.phase !== 'lobby') return { error: '对局进行中，暂时无法加入' };
     if (this.players.length >= MAX_PLAYERS) return { error: `房间已满（最多 ${MAX_PLAYERS} 人）` };
-    const p = { id: genToken(), name, hand: [], ready: false, connected: true, score: 0, outRank: null, peerId: peerId || null, voice: false };
+    const p = { id: genToken(), name, hand: [], ready: false, connected: true, score: 0, outRank: null };
     this.players.push(p);
     this.pushLog(`${name} 加入了房间`);
     return { player: p };
@@ -81,7 +81,6 @@ export class Game {
       case 'play': return this.play(id, msg.ids);
       case 'pass': return this.pass(id);
       case 'reveal': return this.reveal(id);
-      case 'voice': return this.setVoice(id, !!msg.on);
       case 'next': return this.next(id);
       case 'toLobby': return this.toLobby(id);
       default: return '未知操作';
@@ -191,14 +190,6 @@ export class Game {
     this.lastActions[seat] = { type: 'pass' };
     this.pushLog(`${this.players[seat].name} 过牌`);
     this.afterAction();
-    return null;
-  }
-
-  // 语音开关只是"意愿"广播，真正的音频走 WebRTC P2P 直连（见 voice.js）
-  setVoice(id, on) {
-    const p = this.players.find(x => x.id === id);
-    p.voice = on;
-    this.pushLog(`${p.name} ${on ? '开启了' : '关闭了'}语音`);
     return null;
   }
 
@@ -313,8 +304,6 @@ export class Game {
         isMe: p.id === id, isRoomOwner: i === 0,
         isDealer: inGame && i === this.dealer,
         isBlackFive: inGame && this.blackFivePublic && i === this.blackFiveSeat,
-        peerId: i === 0 ? (this.hostPeerId || p.peerId || null) : (p.peerId || null),
-        voice: !!p.voice && p.connected,
       })),
       myHand: inGame ? me.hand : [],
       turnSeat: inGame ? this.turn : null,
