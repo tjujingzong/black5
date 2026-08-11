@@ -9,8 +9,10 @@ import { classify, canBeat, comboName, posName, findHint } from './rules.js';
 
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 6;
-export const QUICK_PHRASES = ['心态崩了啊', '一个小单张', '不走不健康', '快点吧，我等得花儿都谢了'];
+export const QUICK_PHRASES = ['心态崩了啊', '一个小单张，不走不健康', '快点吧，我等得花儿都谢了'];
+export const PASS_PHRASES = ['pass', '要不起', '不要'];
 export const INTERACTION_ITEMS = ['tomato', 'bucket'];
+export const AVATAR_IDS = ['bamboo', 'cloud', 'jade', 'lotus', 'moon', 'pepper', 'plum', 'tiger'];
 
 function genToken() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
@@ -44,6 +46,8 @@ export class Game {
     this.messageSeq = 0;
     this.interactionSeq = 0;
     this.lastInteraction = null;
+    this.audioSeq = 0;
+    this.lastAudioEvent = null;
   }
 
   pushLog(msg) {
@@ -56,12 +60,25 @@ export class Game {
     this.messageSeq ||= 0;
     this.interactionSeq ||= 0;
     this.lastInteraction ||= null;
+    this.audioSeq ||= 0;
+    this.lastAudioEvent ||= null;
+    const usedAvatars = new Set();
     for (const player of this.players) {
       player.publicId ||= genPublicId();
       player.isBot = !!player.isBot;
       player.voice = false;
+      if (!AVATAR_IDS.includes(player.avatar) || usedAvatars.has(player.avatar)) {
+        const available = AVATAR_IDS.filter(avatar => !usedAvatars.has(avatar));
+        player.avatar = available[Math.floor(Math.random() * available.length)] || AVATAR_IDS[0];
+      }
+      usedAvatars.add(player.avatar);
     }
     return this;
+  }
+
+  assignAvatars() {
+    const avatars = shuffle([...AVATAR_IDS]);
+    this.players.forEach((player, index) => { player.avatar = avatars[index % avatars.length]; });
   }
 
   /* ---------------- 房间管理 ---------------- */
@@ -81,6 +98,7 @@ export class Game {
     if (this.players.length >= MAX_PLAYERS) return { error: `房间已满（最多 ${MAX_PLAYERS} 人）` };
     const p = { id: genToken(), publicId: genPublicId(), name, hand: [], ready: false, connected: true, score: 0, outRank: null, isBot: false, voice: false };
     this.players.push(p);
+    this.assignAvatars();
     this.pushLog(`${name} 加入了房间`);
     return { player: p };
   }
@@ -138,6 +156,7 @@ export class Game {
       connected: true, score: 0, outRank: null, isBot: true, voice: false,
     };
     this.players.push(bot);
+    this.assignAvatars();
     this.pushLog(`${bot.name} 加入了房间`);
     return null;
   }
@@ -153,6 +172,7 @@ export class Game {
     }
     if (index < 0) return '房间里没有人机';
     const [bot] = this.players.splice(index, 1);
+    this.assignAvatars();
     this.pushLog(`${bot.name} 离开了房间`);
     return null;
   }
@@ -214,6 +234,7 @@ export class Game {
     // 从庄家开始逆时针轮发：庄家与下家自然多拿一张
     deck.forEach((c, i) => this.players[(this.dealer + i) % n].hand.push(c));
     this.players.forEach(p => sortHand(p.hand));
+    this.assignAvatars();
 
     this.blackFiveSeat = this.players.findIndex(p => p.hand.some(c => c.id === BLACK5_ID));
     this.solo = this.blackFiveSeat === this.dealer;
@@ -265,6 +286,7 @@ export class Game {
     this.pending = { seat, combo, cards };
     this.passStreak = 0;
     this.lastActions[seat] = { type: 'play', cards, name: comboName(combo) };
+    this.lastAudioEvent = { id: ++this.audioSeq, type: 'play', combo };
     this.pushLog(`${p.name} 出 ${comboName(combo)}：${cards.map(cardLabel).join(' ')}`);
 
     // 黑桃5 一出手，身份自然暴露
@@ -284,7 +306,9 @@ export class Game {
     if (this.turn !== seat) return '还没轮到你';
     if (!this.pending) return '本轮由你首出，必须出牌';
     this.passStreak++;
-    this.lastActions[seat] = { type: 'pass' };
+    const voice = PASS_PHRASES[Math.floor(Math.random() * PASS_PHRASES.length)];
+    this.lastActions[seat] = { type: 'pass', voice };
+    this.lastAudioEvent = { id: ++this.audioSeq, type: 'pass', text: voice };
     this.pushLog(`${this.players[seat].name} 过牌`);
     this.afterAction();
     return null;
@@ -410,7 +434,7 @@ export class Game {
       players: this.players.map((p, i) => ({
         id: p.publicId, name: p.name, count: p.hand.length, ready: p.ready,
         connected: p.connected, outRank: p.outRank, score: p.score,
-        isBot: !!p.isBot, voice: !!p.voice,
+        isBot: !!p.isBot, voice: !!p.voice, avatar: p.avatar,
         isMe: p.id === id, isRoomOwner: i === 0,
         isDealer: inGame && i === this.dealer,
         isBlackFive: inGame && this.blackFivePublic && i === this.blackFiveSeat,
@@ -435,6 +459,7 @@ export class Game {
       result: this.result,
       chat: this.chat.slice(-30),
       lastInteraction: this.lastInteraction,
+      audioEvent: this.lastAudioEvent,
       log: this.log.slice(-9),
       canStart: this.phase === 'lobby'
         && this.players.length >= MIN_PLAYERS

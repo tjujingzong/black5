@@ -23,6 +23,7 @@ Cloudflare Workers；每个房间由一个 SQLite-backed Durable Object 承载�
 - 支持房间文字聊天、中文快捷语音、牌面点数/牌型播报和麦克风实时语音。
 - 实时语音由 Cloudflare Durable Object 转发信令，媒体使用浏览器 WebRTC 和 Cloudflare STUN；不依赖 PeerJS 公共服务器。
 - 点击其他玩家头像可发送番茄或水桶，所有客户端同步播放互动动画和音效。
+- 每局从本地头像素材库随机分配不重复头像，真人和人机在所有客户端保持一致。
 - 牌力从小到大为 `4、6、7、8、9、10、J、Q、K、A、2、3、5`，同牌型的 5 可以压 5。
 - 顺子和连对只允许 `4` 到 `A`，最大三张顺子为 `Q-K-A`，`K-A-2` 不成立。
 - 庄家不是大落时本局所有玩家记 `0` 分；庄家大落时按名次正常结算。
@@ -38,6 +39,7 @@ public/                 浏览器静态资源
   audio/
     bassa-island-game-loop.mp3  免费许可循环 BGM
     ATTRIBUTION.md              音乐署名与许可证
+  avatars/                      本地 PNG 头像素材与许可说明
   js/
     main.js             页面入口与断线重连
     net.js              Cloudflare WebSocket 客户端
@@ -65,7 +67,8 @@ npm run dev
 
 打开 Wrangler 输出的本地地址，通常是 `http://localhost:8787`。
 
-进入大厅后点击“添加人机”两次即可用一名真人开局。麦克风权限只能在 HTTPS 或
+进入大厅后点击“添加人机”两次即可用一名真人开局。房间右上角的音乐与牌局音效
+使用两个独立开关。麦克风权限只能在 HTTPS 或
 `localhost` 安全上下文使用；线上 `workers.dev` 地址天然满足 HTTPS 要求。
 
 运行测试和部署前检查：
@@ -96,3 +99,7 @@ npm run deploy
 背景音乐使用 Kevin MacLeod 的 **Bassa Island Game Loop**，依据
 [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/) 使用。
 完整署名见 [`public/audio/ATTRIBUTION.md`](public/audio/ATTRIBUTION.md)。
+
+头像素材通过 DiceBear 的 **Adventurer** 风格生成，原画作者 Lisa Wischofsky，依据
+[Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/) 使用。
+完整署名见 [`public/avatars/ATTRIBUTION.md`](public/avatars/ATTRIBUTION.md)。

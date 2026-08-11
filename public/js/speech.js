@@ -12,3 +12,7 @@ export function comboSpeech(combo) {
     pairs: '连对',
   }[combo.kind] || '';
 }
+
+export function speechLanguage(text) {
+  return String(text || '').trim().toLowerCase() === 'pass' ? 'en-US' : 'zh-CN';
+}

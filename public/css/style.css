@@ -31,8 +31,8 @@ button.accent:hover:not(:disabled){background:#8b5cf6;}
 button.big{padding:11px 22px;font-size:16px;}
 button.mini{padding:3px 10px;font-size:12px;border-radius:8px;}
 .room-tools{display:flex;align-items:center;gap:7px;}
-.audio-toggle{width:34px;height:28px;padding:0;font-size:17px;line-height:1;}
-.audio-toggle.active{color:var(--gold);border-color:var(--gold);}
+.sound-toggle{width:34px;height:28px;padding:0;font-size:16px;line-height:1;}
+.sound-toggle.active{color:var(--gold);border-color:var(--gold);}
 .voice-toggle{width:34px;height:28px;padding:0;font-size:16px;line-height:1;}
 .voice-toggle.active{color:#79f2b2;border-color:#79f2b2;background:#0f7854;}
 input{
@@ -72,8 +72,8 @@ input:focus{border-color:var(--gold);}
 .plist li.off{opacity:.5;}
 .pstate{font-size:13px;opacity:.85;}
 .pname{display:flex;align-items:center;gap:8px;}
-.lobby-avatar,.avatar-static{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;
-  border-radius:50%;background:#d7eee4;color:#103c2f;font-weight:800;flex:0 0 auto;}
+.lobby-avatar,.avatar-static{display:block;width:28px;height:28px;border-radius:50%;object-fit:cover;
+  background:#d7eee4;border:1px solid rgba(255,255,255,.65);flex:0 0 auto;}
 .actions-col{display:flex;flex-direction:column;align-items:center;gap:10px;}
 .bot-actions{display:flex;gap:8px;}
 .actions{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
@@ -93,8 +93,9 @@ input:focus{border-color:var(--gold);}
 .chip.off{opacity:.55;}
 .chip.out{background:rgba(255,255,255,.10);}
 .avatar{position:absolute;left:9px;top:10px;width:35px;height:35px;border-radius:50%;padding:0;
-  background:#d7eee4;color:#103c2f;border:2px solid rgba(255,255,255,.65);font-weight:800;z-index:3;}
+  overflow:hidden;background:#d7eee4;border:2px solid rgba(255,255,255,.65);z-index:3;}
 .avatar:hover:not(:disabled){background:#fff;transform:scale(1.06);}
+.avatar img{display:block;width:100%;height:100%;object-fit:cover;}
 .chip-main{padding-left:34px;}
 .seat-top{left:50%;top:12%;}
 .seat-top-left{left:28%;top:14%;}

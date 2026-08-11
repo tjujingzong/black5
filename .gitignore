@@ -1,5 +1,6 @@
 .DS_Store
 *.png
+!public/avatars/*.png
 node_modules/
 .wrangler/
 .dev.vars

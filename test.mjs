@@ -1,8 +1,8 @@
 // Node 冒烟测试：牌型规则 + 5 人完整对局模拟（bot 自动打完）
-import { Game } from './public/js/engine.js';
+import { Game, AVATAR_IDS, PASS_PHRASES } from './public/js/engine.js';
 import { classify, canBeat, findHint } from './public/js/rules.js';
 import { BLACK5_ID, sortHand } from './public/js/cards.js';
-import { comboSpeech } from './public/js/speech.js';
+import { comboSpeech, speechLanguage } from './public/js/speech.js';
 
 let failed = 0;
 function ok(cond, msg) {
@@ -54,6 +54,8 @@ ok(comboSpeech({ kind: 'straight', rank: 14 }) === '顺子', '顺子牌型播报
 ok(comboSpeech({ kind: 'pairs', rank: 13 }) === '连对', '连对牌型播报');
 ok(comboSpeech({ kind: 'triple', rank: 9 }) === '三个9，炸弹', '三张炸弹播报');
 ok(comboSpeech({ kind: 'quad', rank: 10 }) === '四个10，轰牌', '四张轰牌播报');
+ok(speechLanguage('pass') === 'en-US' && speechLanguage('要不起') === 'zh-CN'
+  && speechLanguage('5') === 'zh-CN', '过牌语音自动选择中英文发音，牌面数字保持中文');
 
 console.log('== 计分与人机 ==');
 const zeroGame = new Game();
@@ -96,7 +98,7 @@ ok(botGame.players.filter(player => player.isBot).length === 2, '人机座位已
 const firstBotId = botGame.players.find(player => player.isBot).publicId;
 ok(botGame.handleMsg(hostId, { t: 'chat', text: ' 本地联机测试 ' }) === null
   && botGame.chat.at(-1).text === '本地联机测试', '文字聊天会清理首尾空白并保存');
-ok(botGame.handleMsg(hostId, { t: 'quick', text: '一个小单张' }) === null
+ok(botGame.handleMsg(hostId, { t: 'quick', text: '一个小单张，不走不健康' }) === null
   && botGame.chat.at(-1).quick, '快捷语音按白名单发送');
 ok(botGame.handleMsg(hostId, { t: 'quick', text: '任意播报' }) === '快捷语音无效', '拒绝伪造的快捷语音');
 ok(botGame.handleMsg(hostId, { t: 'voiceStatus', enabled: true }) === null
@@ -107,6 +109,9 @@ ok(botGame.handleMsg(hostId, { t: 'interact', to: botGame.players[0].publicId, i
 const hostView = botGame.viewFor(hostId);
 ok(hostView.myId !== hostId && hostView.players.every(player => player.id !== hostId), '公开玩家 ID 不泄露断线重连令牌');
 ok(botGame.handleMsg(hostId, { t: 'start' }) === null, '一名真人加两名人机可开始游戏');
+ok(new Set(botGame.players.map(player => player.avatar)).size === botGame.players.length
+  && botGame.players.every(player => AVATAR_IDS.includes(player.avatar)), '每局为玩家分配不重复的素材头像');
+ok(botGame.viewFor(hostId).players.every(player => AVATAR_IDS.includes(player.avatar)), '头像编号同步到玩家视图');
 let botSteps = 0;
 while (botGame.phase === 'playing' && botSteps < 5000) {
   const player = botGame.players[botGame.turn];
@@ -119,6 +124,16 @@ while (botGame.phase === 'playing' && botSteps < 5000) {
   botSteps++;
 }
 ok(botGame.phase === 'roundEnd', `人机对局正常结束（${botSteps} 步）`);
+
+const passGame = new Game();
+const passIds = ['甲', '乙', '丙'].map(name => passGame.join(name).player.id);
+passGame.phase = 'playing';
+passGame.turn = 0;
+passGame.pending = { seat: 1, combo: { kind: 'single', rank: 6, len: 1 }, cards: [] };
+ok(passGame.pass(passIds[0]) === null
+  && passGame.lastAudioEvent.type === 'pass'
+  && PASS_PHRASES.includes(passGame.lastAudioEvent.text)
+  && passGame.lastActions[0].voice === passGame.lastAudioEvent.text, '过牌随机播报会写入权威音频事件');
 
 console.log('== 整局模拟（随机 20 局）==');
 for (let t = 0; t < 20; t++) {

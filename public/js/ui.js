@@ -181,7 +181,7 @@ function lobbyHtml(v) {
   const botCount = v.players.filter(p => p.isBot).length;
   const list = v.players.map(p => `
     <li class="${p.connected ? '' : 'off'}">
-      <span class="pname"><span class="lobby-avatar">${avatarChar(p.name)}</span>${esc(p.name)}${p.isMe ? '（我）' : ''}</span>
+      <span class="pname"><img class="lobby-avatar" src="${avatarSrc(p.avatar)}" alt="">${esc(p.name)}${p.isMe ? '（我）' : ''}</span>
       <span class="pstate">${p.isBot ? '人机 · 已准备' : p.isRoomOwner ? '房主' : p.ready ? '已准备' : '未准备'}</span>
     </li>`).join('');
   const actions = v.isHost
@@ -260,7 +260,7 @@ function gameHtml(v) {
     ${secret}
     <div class="self-zone">
       <div class="self-profile">
-        <span class="avatar-static" data-avatar-id="${esc(me.id)}">${avatarChar(me.name)}</span>
+        <img class="avatar-static" data-avatar-id="${esc(me.id)}" src="${avatarSrc(me.avatar)}" alt="">
         <span>${esc(me.name)}</span>${me.voice ? '<i class="voice-mark">语音中</i>' : ''}
       </div>
       <div class="myact">${myAct}</div>
@@ -296,7 +296,7 @@ function chipHtml(v, p, position) {
     ? (la.type === 'pass' ? '<span class="act pass">过牌</span>' : '<span class="act">已出牌</span>')
     : '';
   return `<div class="${cls.join(' ')}">
-    <button class="avatar" data-player-id="${esc(p.id)}" data-avatar-id="${esc(p.id)}" aria-label="向${esc(p.name)}使用道具" title="向${esc(p.name)}使用道具">${avatarChar(p.name)}</button>
+    <button class="avatar" data-player-id="${esc(p.id)}" data-avatar-id="${esc(p.id)}" aria-label="向${esc(p.name)}使用道具" title="向${esc(p.name)}使用道具"><img src="${avatarSrc(p.avatar)}" alt=""></button>
     <div class="chip-main">
       <div class="cname">${esc(p.name)}${tags}</div>
       ${meta}${p.connected ? '' : '<span class="meta off-tag">离线</span>'}
@@ -306,8 +306,9 @@ function chipHtml(v, p, position) {
   </div>`;
 }
 
-function avatarChar(name) {
-  return esc(Array.from(String(name || '?'))[0] || '?');
+function avatarSrc(avatar) {
+  const safe = /^[a-z0-9-]+$/.test(String(avatar || '')) ? avatar : 'bamboo';
+  return `/avatars/${safe}.png`;
 }
 
 function propMenuHtml(v) {
