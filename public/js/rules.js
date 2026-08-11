@@ -1,30 +1,36 @@
 // 牌型判定 / 比大小 / 出牌提示
 // 牌力从小到大：4 6 7 8 9 10 J Q K A 2 3 5；同牌型的 5 可以压 5。
 // 牌型：single 单张 | pair 对子 | triple 三张(炸弹) | quad 四张(轰牌)
-//       straight 顺子(3张以上) | pairs 连对(2连对以上)
+//       straight 顺子(3张以上，5可有可无) | pairs 姊妹对(2组或3组)
 
-import { SEQUENCE_ORDER, rankStrength } from './cards.js';
+import { STRAIGHT_ORDERS, SISTER_PAIR_ORDER, rankStrength } from './cards.js';
 
 function sortRanks(ranks) {
   return ranks.sort((a, b) => rankStrength(a) - rankStrength(b));
 }
 
-const SEQUENCE_STRENGTH = new Map(SEQUENCE_ORDER.map((rank, index) => [rank, index]));
+const STRAIGHT_STRENGTHS = STRAIGHT_ORDERS.map(order => new Map(order.map((rank, index) => [rank, index])));
+const STRAIGHT_STRENGTH = STRAIGHT_STRENGTHS[0];
+const SISTER_PAIR_STRENGTH = new Map(SISTER_PAIR_ORDER.map((rank, index) => [rank, index]));
 
-function sortSequenceRanks(ranks) {
-  return ranks.sort((a, b) => (SEQUENCE_STRENGTH.get(a) ?? Infinity) - (SEQUENCE_STRENGTH.get(b) ?? Infinity));
+function sortByStrength(ranks, strength) {
+  return ranks.sort((a, b) => (strength.get(a) ?? Infinity) - (strength.get(b) ?? Infinity));
 }
 
 function rankCanBeat(a, b) {
   return rankStrength(a) > rankStrength(b) || (a === 5 && b === 5);
 }
 
-function consecutive(ranks) {
-  if (ranks.some(rank => !SEQUENCE_STRENGTH.has(rank))) return false;
+function consecutive(ranks, strength) {
+  if (ranks.some(rank => !strength.has(rank))) return false;
   for (let i = 1; i < ranks.length; i++) {
-    if (SEQUENCE_STRENGTH.get(ranks[i]) !== SEQUENCE_STRENGTH.get(ranks[i - 1]) + 1) return false;
+    if (strength.get(ranks[i]) !== strength.get(ranks[i - 1]) + 1) return false;
   }
   return true;
+}
+
+function straightRanksValid(ranks) {
+  return STRAIGHT_STRENGTHS.some(strength => consecutive(ranks, strength));
 }
 
 export function classify(cards) {
@@ -42,16 +48,16 @@ export function classify(cards) {
     return null;
   }
 
-  const sequenceRanks = sortSequenceRanks([...uniq]);
-  if (n >= 3 && uniq.length === n && consecutive(sequenceRanks)) {
-    return { kind: 'straight', rank: sequenceRanks[sequenceRanks.length - 1], len: n };
+  const straightRanks = sortByStrength([...uniq], STRAIGHT_STRENGTH);
+  if (n >= 3 && uniq.length === n && straightRanksValid(straightRanks)) {
+    return { kind: 'straight', rank: straightRanks[straightRanks.length - 1], len: n };
   }
 
-  if (n >= 4 && n % 2 === 0) {
+  if (n === 4 || n === 6) {
     const count = new Map();
     for (const rank of ranks) count.set(rank, (count.get(rank) || 0) + 1);
-    const pairRanks = sortSequenceRanks([...count.keys()]);
-    if ([...count.values()].every(value => value === 2) && consecutive(pairRanks)) {
+    const pairRanks = sortByStrength([...count.keys()], SISTER_PAIR_STRENGTH);
+    if ([...count.values()].every(value => value === 2) && consecutive(pairRanks, SISTER_PAIR_STRENGTH)) {
       return { kind: 'pairs', rank: pairRanks[pairRanks.length - 1], len: n };
     }
   }
@@ -69,6 +75,8 @@ export function canBeat(a, b) {
   const aBomb = bombLevel(a), bBomb = bombLevel(b);
   if (aBomb !== bBomb) return aBomb > bBomb;
   if (a.kind !== b.kind || a.len !== b.len) return false;
+  if (a.kind === 'straight') return STRAIGHT_STRENGTH.get(a.rank) > STRAIGHT_STRENGTH.get(b.rank);
+  if (a.kind === 'pairs') return SISTER_PAIR_STRENGTH.get(a.rank) > SISTER_PAIR_STRENGTH.get(b.rank);
   return rankCanBeat(a.rank, b.rank);
 }
 
@@ -79,7 +87,7 @@ export function comboName(combo) {
     case 'triple': return '三张(炸弹)';
     case 'quad': return '四张(轰牌)';
     case 'straight': return `${combo.len}张顺子`;
-    case 'pairs': return `${combo.len / 2}连对`;
+    case 'pairs': return `${combo.len / 2}组姊妹对`;
     default: return '';
   }
 }
@@ -115,12 +123,12 @@ export function findHint(hand, combo) {
       break;
     }
     case 'straight': {
-      const result = findSequence(byRank, combo.len, 1, combo);
+      const result = findStraight(byRank, combo);
       if (result) return result;
       break;
     }
     case 'pairs': {
-      const result = findSequence(byRank, combo.len / 2, 2, combo);
+      const result = findSequence(byRank, SISTER_PAIR_ORDER, combo.len / 2, 2, combo);
       if (result) return result;
       break;
     }
@@ -137,9 +145,34 @@ export function findHint(hand, combo) {
   return null;
 }
 
-function findSequence(byRank, rankCount, cardsPerRank, combo) {
-  for (let start = 0; start + rankCount <= SEQUENCE_ORDER.length; start++) {
-    const ranks = SEQUENCE_ORDER.slice(start, start + rankCount);
+function findStraight(byRank, combo) {
+  const candidates = [];
+  const seen = new Set();
+  for (const order of STRAIGHT_ORDERS) {
+    for (let start = 0; start + combo.len <= order.length; start++) {
+      const ranks = order.slice(start, start + combo.len);
+      const key = ranks.join(',');
+      if (seen.has(key) || !ranks.every(rank => (byRank.get(rank) || []).length)) continue;
+      seen.add(key);
+      const rank = sortByStrength([...ranks], STRAIGHT_STRENGTH).at(-1);
+      const candidate = { kind: 'straight', rank, len: combo.len };
+      if (!canBeat(candidate, combo)) continue;
+      candidates.push({
+        ranks,
+        rank,
+        usesFive: ranks.includes(5),
+        cards: ranks.map(candidateRank => byRank.get(candidateRank)[0]),
+      });
+    }
+  }
+  candidates.sort((a, b) => STRAIGHT_STRENGTH.get(a.rank) - STRAIGHT_STRENGTH.get(b.rank)
+    || Number(a.usesFive) - Number(b.usesFive));
+  return candidates[0]?.cards || null;
+}
+
+function findSequence(byRank, order, rankCount, cardsPerRank, combo) {
+  for (let start = 0; start + rankCount <= order.length; start++) {
+    const ranks = order.slice(start, start + rankCount);
     if (!ranks.every(rank => (byRank.get(rank) || []).length >= cardsPerRank)) continue;
     const candidate = { kind: combo.kind, rank: ranks[ranks.length - 1], len: combo.len };
     if (!canBeat(candidate, combo)) continue;

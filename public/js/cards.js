@@ -5,8 +5,12 @@
 export const SUITS = ['♠', '♥', '♣', '♦'];
 export const BLACK5_ID = '0-5'; // 黑桃5 —— 决定"黑五"身份的关键牌
 export const RANK_ORDER = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 3, 5];
-// 顺子使用独立顺序：2-3-4 最小，Q-K-A 最大；5 不参与顺子。
-export const SEQUENCE_ORDER = [15, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+// 顺子可经过或跳过 5；姊妹对只能使用 4、6 到 A。
+export const STRAIGHT_ORDERS = [
+  [15, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+  [15, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+];
+export const SISTER_PAIR_ORDER = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
 const RANK_STRENGTH = new Map(RANK_ORDER.map((rank, index) => [rank, index]));
 

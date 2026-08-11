@@ -17,16 +17,25 @@ ok(classify([C(9, 0), C(9, 1)]).kind === 'pair', '对子');
 ok(classify([C(9, 0), C(9, 1), C(9, 2)]).kind === 'triple', '三张=炸弹');
 ok(classify([C(9, 0), C(9, 1), C(9, 2), C(9, 3)]).kind === 'quad', '四张=轰牌');
 ok(classify([C(15), C(3), C(4)]).kind === 'straight', '2-3-4 是最小顺子');
+ok(classify([C(3), C(4), C(5)]).kind === 'straight', '3-4-5 顺子合法');
 ok(classify([C(3), C(4), C(6)]).kind === 'straight', '3-4-6 顺子合法');
+ok(classify([C(4), C(5), C(6)]).kind === 'straight', '4-5-6 顺子合法');
 ok(classify([C(4), C(6), C(7)]).kind === 'straight', '4-6-7 顺子合法');
+ok(classify([C(5), C(6), C(7)]).kind === 'straight', '5-6-7 顺子合法');
+ok(classify([C(3), C(4), C(5), C(6), C(7)]).kind === 'straight', '3-4-5-6-7 长顺子合法');
 ok(classify([C(12), C(13), C(14)]).kind === 'straight', 'Q-K-A 是最大顺子');
 ok(classify([C(13), C(14), C(15)]) === null, 'K-A-2 不是顺子');
 ok(classify([C(15), C(3), C(4), C(6)]).kind === 'straight', '2-3-4-6 长顺子合法');
-ok(classify([C(15), C(3), C(5)]) === null, '含 5 的组合不是顺子');
-ok(classify([C(3), C(5), C(4)]) === null, '5 不参与顺子');
-ok(classify([C(13, 0), C(13, 1), C(14, 2), C(14, 3)]).kind === 'pairs', 'K-A 连对合法');
-ok(classify([C(15, 0), C(15, 1), C(3, 2), C(3, 3)]).kind === 'pairs', '对2-对3 连对合法');
-ok(classify([C(14, 0), C(14, 1), C(15, 2), C(15, 3)]) === null, '对A-对2 不是连对');
+ok(classify([C(15), C(3), C(5)]) === null, '2-3-5 缺少 4，不是顺子');
+ok(classify([C(4, 0), C(4, 1), C(6, 2), C(6, 3)]).kind === 'pairs', '4-4-6-6 姊妹对合法');
+ok(classify([C(8, 0), C(8, 1), C(9, 2), C(9, 3), C(10, 0), C(10, 1)]).kind === 'pairs', '8-8-9-9-10-10 三组姊妹对合法');
+ok(classify([C(13, 0), C(13, 1), C(14, 2), C(14, 3)]).kind === 'pairs', 'K-K-A-A 是最大两组姊妹对');
+ok(classify([C(12, 0), C(12, 1), C(13, 2), C(13, 3), C(14, 0), C(14, 1)]).kind === 'pairs', 'Q-Q-K-K-A-A 是最大三组姊妹对');
+ok(classify([C(15, 0), C(15, 1), C(3, 2), C(3, 3)]) === null, '姊妹对不能使用 2 和 3');
+ok(classify([C(3, 0), C(3, 1), C(4, 2), C(4, 3)]) === null, '姊妹对不能使用 3');
+ok(classify([C(4, 0), C(4, 1), C(5, 2), C(5, 3)]) === null, '姊妹对不能使用 5');
+ok(classify([C(14, 0), C(14, 1), C(15, 2), C(15, 3)]) === null, '姊妹对不能使用 2');
+ok(classify([C(4, 0), C(4, 1), C(6, 2), C(6, 3), C(7, 0), C(7, 1), C(8, 2), C(8, 3)]) === null, '姊妹对最多三组');
 ok(classify([C(3), C(5), C(7)]) === null, '不连续不是顺子');
 
 console.log('== 比大小 ==');
@@ -34,8 +43,14 @@ ok(canBeat({ kind: 'triple', rank: 5, len: 3 }, { kind: 'straight', rank: 14, le
 ok(canBeat({ kind: 'quad', rank: 4, len: 4 }, { kind: 'triple', rank: 14, len: 3 }), '轰牌压炸弹');
 ok(!canBeat({ kind: 'single', rank: 15, len: 1 }, { kind: 'single', rank: 15, len: 1 }), '同点不能压');
 ok(!canBeat({ kind: 'straight', rank: 10, len: 4 }, { kind: 'straight', rank: 10, len: 5 }), '不同长度顺子不能互压');
+ok(canBeat({ kind: 'straight', rank: 5, len: 3 }, { kind: 'straight', rank: 4, len: 3 }), '3-4-5 能压 2-3-4');
+ok(canBeat({ kind: 'straight', rank: 6, len: 3 }, { kind: 'straight', rank: 5, len: 3 }), '3-4-6 能压 3-4-5');
+ok(!canBeat({ kind: 'straight', rank: 6, len: 3 }, { kind: 'straight', rank: 6, len: 3 }), '3-4-6 与 4-5-6 同级，不能互压');
 ok(canBeat({ kind: 'straight', rank: 6, len: 3 }, { kind: 'straight', rank: 4, len: 3 }), '3-4-6 能压 2-3-4');
 ok(!canBeat({ kind: 'straight', rank: 4, len: 3 }, { kind: 'straight', rank: 14, len: 3 }), '2-3-4 不能压 Q-K-A');
+ok(canBeat({ kind: 'pairs', rank: 14, len: 4 }, { kind: 'pairs', rank: 13, len: 4 }), 'K-K-A-A 能压 Q-Q-K-K');
+ok(!canBeat({ kind: 'pairs', rank: 14, len: 4 }, { kind: 'pairs', rank: 14, len: 4 }), 'K-K-A-A 不能被同级姊妹对压住');
+ok(canBeat({ kind: 'triple', rank: 4, len: 3 }, { kind: 'pairs', rank: 14, len: 4 }), '炸弹可以压最大姊妹对');
 ok(canBeat({ kind: 'pair', rank: 15, len: 2 }, { kind: 'pair', rank: 14, len: 2 }), '对2 > 对A');
 ok(canBeat({ kind: 'single', rank: 3, len: 1 }, { kind: 'single', rank: 15, len: 1 }), '3 > 2');
 ok(canBeat({ kind: 'single', rank: 5, len: 1 }, { kind: 'single', rank: 4, len: 1 }), '5 > 4');
@@ -56,6 +71,21 @@ const nextStraightHint = findHint(
   { kind: 'straight', rank: 4, len: 3 },
 );
 ok(nextStraightHint?.map(card => card.rank).join(',') === '3,4,6', '顺子提示能用 3-4-6 压 2-3-4');
+const withFiveHint = findHint(
+  [C(3), C(4), C(5), C(6)],
+  { kind: 'straight', rank: 4, len: 3 },
+);
+ok(withFiveHint?.map(card => card.rank).join(',') === '3,4,5', '顺子提示优先用 3-4-5 压 2-3-4');
+const preserveFiveHint = findHint(
+  [C(3), C(4), C(5), C(6)],
+  { kind: 'straight', rank: 5, len: 3 },
+);
+ok(preserveFiveHint?.map(card => card.rank).join(',') === '3,4,6', '同级顺子提示优先跳过并保留 5');
+const sisterPairHint = findHint(
+  [C(6, 0), C(6, 1), C(7, 2), C(7, 3)],
+  { kind: 'pairs', rank: 6, len: 4 },
+);
+ok(sisterPairHint?.map(card => card.rank).join(',') === '6,6,7,7', '提示能找到 6-6-7-7 压 4-4-6-6');
 
 console.log('== 出牌播报 ==');
 for (const rank of [15, 3, 4, 5]) {
@@ -63,7 +93,7 @@ for (const rank of [15, 3, 4, 5]) {
 }
 ok(comboSpeech({ kind: 'pair', rank: 14 }) === '对A', '对子会播报具体点数');
 ok(comboSpeech({ kind: 'straight', rank: 14 }) === '顺子', '顺子牌型播报');
-ok(comboSpeech({ kind: 'pairs', rank: 13 }) === '连对', '连对牌型播报');
+ok(comboSpeech({ kind: 'pairs', rank: 13 }) === '姊妹对', '姊妹对牌型播报');
 ok(comboSpeech({ kind: 'triple', rank: 9 }) === '三个9，炸弹', '三张炸弹播报');
 ok(comboSpeech({ kind: 'quad', rank: 10 }) === '四个10，轰牌', '四张轰牌播报');
 ok(speechLanguage('pass') === 'en-US' && speechLanguage('要不起') === 'zh-CN'
