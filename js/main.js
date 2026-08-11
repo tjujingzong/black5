@@ -1,6 +1,6 @@
 // 入口：首页交互 + 房主/客人两种模式的装配
 import { Game } from './engine.js';
-import { HostNet, GuestNet } from './net.js';
+import { HostNet, GuestNet, describePeerError } from './net.js';
 import { VoiceManager } from './voice.js';
 import { init as initUI, render, bindSend, toast, setRoomInfo } from './ui.js';
 
@@ -93,7 +93,7 @@ $('#btn-create').addEventListener('click', () => {
     showRoom();
     refreshHost();
   }, err => {
-    toast('创建房间失败：' + ((err && err.type) || err));
+    toast('创建房间失败：' + describePeerError(err));
     $('#btn-create').disabled = false;
     $('#btn-create').textContent = '创建房间';
   });
@@ -140,6 +140,7 @@ function startGuest(code, name) {
     },
   });
   guestNet.join(code, name, token);
+  toast('正在连接房间…');
   voice.attach(guestNet.peer); // 重连后是新 Peer，需重新监听呼入
 }
 
