@@ -85,7 +85,12 @@ export class Room {
     this.game = null;
     this.botRunning = false;
     state.blockConcurrencyWhile(async () => {
-      this.game = restoreGame(await state.storage.get('game'));
+      const [saved, expiresAt] = await Promise.all([
+        state.storage.get('game'),
+        state.storage.get('expiresAt'),
+      ]);
+      this.game = restoreGame(saved);
+      this.expiresAt = expiresAt || Date.now() + ROOM_TTL_MS;
     });
   }
 
@@ -144,6 +149,12 @@ export class Room {
       return;
     }
 
+    if (this.game.timeoutTurn()) {
+      await this.persist();
+      this.broadcast();
+      await this.runBots();
+    }
+
     const error = this.game.handleMsg(attachment.playerId, data);
     if (error) {
       this.send(ws, { t: 'err', msg: error });
@@ -172,6 +183,9 @@ export class Room {
 
     const playerId = result.player.id;
     ws.serializeAttachment({ playerId });
+    if (this.game.phase === 'playing' && !Number.isFinite(this.game.turnDeadline)) {
+      this.game.resetTurnTimer();
+    }
     for (const other of this.state.getWebSockets()) {
       if (other === ws) continue;
       const otherAttachment = other.deserializeAttachment() || {};
@@ -201,6 +215,8 @@ export class Room {
     });
     if (hasReplacement) return;
     this.game.handleDisconnect(playerId);
+    const hasConnections = this.state.getWebSockets().some(other => other !== ws && other.readyState === 1);
+    if (!hasConnections && this.game.phase === 'playing') this.game.pauseTurnTimer();
     await this.persist();
     this.broadcast();
   }
@@ -263,16 +279,43 @@ export class Room {
   }
 
   async persist() {
+    this.expiresAt = Date.now() + ROOM_TTL_MS;
     await Promise.all([
       this.state.storage.put('game', this.game),
-      this.state.storage.setAlarm(Date.now() + ROOM_TTL_MS),
+      this.state.storage.put('expiresAt', this.expiresAt),
+      this.scheduleAlarm(),
     ]);
+  }
+
+  scheduleAlarm() {
+    const hasConnections = this.state.getWebSockets().some(ws => ws.readyState === 1);
+    const turnDeadline = hasConnections && this.game?.phase === 'playing'
+      ? this.game.turnDeadline
+      : null;
+    const next = Number.isFinite(turnDeadline)
+      ? Math.min(this.expiresAt, turnDeadline)
+      : this.expiresAt;
+    return this.state.storage.setAlarm(Math.max(Date.now() + 50, next));
   }
 
   async alarm() {
     const hasConnections = this.state.getWebSockets().some(ws => ws.readyState === 1);
     if (hasConnections) {
-      await this.state.storage.setAlarm(Date.now() + ROOM_TTL_MS);
+      if (this.game?.timeoutTurn()) {
+        await this.persist();
+        this.broadcast();
+        await this.runBots();
+        return;
+      }
+      this.expiresAt = Date.now() + ROOM_TTL_MS;
+      await Promise.all([
+        this.state.storage.put('expiresAt', this.expiresAt),
+        this.scheduleAlarm(),
+      ]);
+      return;
+    }
+    if (Date.now() < this.expiresAt) {
+      await this.scheduleAlarm();
       return;
     }
     this.game = null;

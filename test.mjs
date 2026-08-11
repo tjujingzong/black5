@@ -1,5 +1,5 @@
 // Node 冒烟测试：牌型规则 + 5 人完整对局模拟（bot 自动打完）
-import { Game, AVATAR_IDS, PASS_PHRASES } from './public/js/engine.js';
+import { Game, AVATAR_IDS, PASS_PHRASES, TURN_SECONDS } from './public/js/engine.js';
 import { classify, canBeat, findHint } from './public/js/rules.js';
 import { BLACK5_ID, sortHand } from './public/js/cards.js';
 import { comboSpeech, speechLanguage } from './public/js/speech.js';
@@ -71,7 +71,30 @@ ok(speechLanguage('pass') === 'en-US' && speechLanguage('要不起') === 'zh-CN'
 
 console.log('== 客户端黑五音效 ==');
 globalThis.localStorage = { getItem: () => null, setItem: () => {} };
-const { gameAudio } = await import('./public/js/audio.js');
+const spokenByBrowser = [];
+globalThis.SpeechSynthesisUtterance = class {
+  constructor(text) { this.text = text; }
+};
+globalThis.speechSynthesis = {
+  resume: () => {},
+  cancel: () => {},
+  getVoices: () => [],
+  speak: utterance => spokenByBrowser.push(utterance.text),
+};
+globalThis.AudioContext = class {
+  constructor() { this.state = 'suspended'; this.currentTime = 0; this.sampleRate = 44100; }
+  createGain() { return { gain: { value: 0, setTargetAtTime: () => {} }, connect: () => {} }; }
+  createBuffer() { return {}; }
+  createBufferSource() { return { connect: () => {}, start: () => {} }; }
+  resume() { this.state = 'running'; return Promise.resolve(); }
+};
+const { gameAudio, MUSIC_TRACKS } = await import('./public/js/audio.js');
+gameAudio.unlock(true);
+await Promise.resolve();
+ok(gameAudio.context?.state === 'running' && gameAudio.userActivated && gameAudio.speechPrimed,
+  '首次触摸会同时解锁移动端 Web Audio 和语音');
+ok(MUSIC_TRACKS.length === 3 && new Set(MUSIC_TRACKS.map(track => track.src)).size === 3,
+  '随机 BGM 曲库包含三首不重复的本地音乐');
 const blackFiveTones = [];
 gameAudio.context = { state: 'running', currentTime: 10 };
 gameAudio.effectGain = {};
@@ -79,6 +102,24 @@ gameAudio.effectsEnabled = true;
 gameAudio.voice = (...args) => blackFiveTones.push(args);
 gameAudio.play('blackFive');
 ok(blackFiveTones.length === 3, '黑五专属音效包含三段警示音色');
+
+gameAudio.pendingEffects = [];
+gameAudio.context = null;
+gameAudio.userActivated = false;
+gameAudio.play('card');
+ok(gameAudio.pendingEffects[0] === 'card', '音效在移动端解锁完成前进入待播放队列');
+gameAudio.context = { state: 'running', currentTime: 10 };
+gameAudio.userActivated = true;
+gameAudio.flushEffects();
+ok(gameAudio.pendingEffects.length === 0, '解锁完成后会补播等待中的牌局音效');
+
+gameAudio.pendingSpeech = [];
+gameAudio.userActivated = false;
+gameAudio.speak('一个小单张，不走不健康');
+ok(gameAudio.pendingSpeech.length === 1, '快捷语音在首次触摸前进入待播放队列');
+gameAudio.userActivated = true;
+gameAudio.flushSpeech();
+ok(spokenByBrowser.includes('一个小单张，不走不健康'), '首次触摸后会补播等待中的快捷语音');
 
 const audioCalls = [];
 const spoken = [];
@@ -199,6 +240,37 @@ ok(blackFiveGame.play(blackFiveIds[0], [BLACK5_ID]) === null
   && blackFiveGame.blackFivePublic
   && blackFiveGame.lastAudioEvent.type === 'play'
   && blackFiveGame.lastAudioEvent.blackFive === true, '打出黑桃5会生成专属音效标记');
+
+console.log('== 20 秒出牌倒计时 ==');
+const timeoutPassGame = new Game();
+const timeoutPassIds = ['甲', '乙', '丙'].map(name => timeoutPassGame.join(name).player.id);
+timeoutPassGame.phase = 'playing';
+timeoutPassGame.turn = 0;
+timeoutPassGame.pending = { seat: 1, combo: { kind: 'single', rank: 6, len: 1 }, cards: [C(6)] };
+timeoutPassGame.players.forEach((player, index) => { player.hand = [C(7 + index, index)]; player.outRank = null; });
+timeoutPassGame.turnDeadline = Date.now() - 1;
+ok(timeoutPassGame.timeoutTurn()
+  && timeoutPassGame.lastActions[0].type === 'pass'
+  && timeoutPassGame.lastActions[0].timeout
+  && timeoutPassGame.turn === 1,
+  '有待压牌时超时会自动过牌并推进回合');
+
+const timeoutLeadGame = new Game();
+const timeoutLeadIds = ['甲', '乙', '丙'].map(name => timeoutLeadGame.join(name).player.id);
+timeoutLeadGame.phase = 'playing';
+timeoutLeadGame.turn = 0;
+timeoutLeadGame.players[0].hand = [C(5), C(4, 1)];
+timeoutLeadGame.players[1].hand = [C(6, 2)];
+timeoutLeadGame.players[2].hand = [C(7, 3)];
+timeoutLeadGame.turnDeadline = Date.now() - 1;
+ok(timeoutLeadGame.timeoutTurn()
+  && timeoutLeadGame.pending.cards[0].rank === 4
+  && timeoutLeadGame.lastActions[0].timeout,
+  '必须首出时超时会自动打出最小单张');
+const timeoutView = timeoutLeadGame.viewFor(timeoutLeadIds[0]);
+ok(timeoutView.turnSeconds === TURN_SECONDS
+  && timeoutView.turnDeadline > timeoutView.serverNow,
+  '玩家视图同步 20 秒截止时间和服务器时钟');
 
 console.log('== 整局模拟（随机 20 局）==');
 for (let t = 0; t < 20; t++) {

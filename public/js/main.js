@@ -22,7 +22,9 @@ const voiceChat = new VoiceChat({
     button.disabled = busy;
     button.classList.toggle('active', enabled);
     button.setAttribute('aria-pressed', String(enabled));
-    button.textContent = enabled ? '🎙' : '🎤';
+    const icon = button.querySelector('span');
+    if (icon) icon.textContent = enabled ? '🎙' : '🎤';
+    else button.textContent = enabled ? '🎙' : '🎤';
     const label = busy ? '正在开启麦克风' : enabled ? '关闭语音' : '开启语音';
     button.setAttribute('aria-label', label);
     button.title = label;

@@ -10,3 +10,5 @@ The PNG files in this directory were generated with DiceBear using the
 
 The generated PNG files are stored locally so the game does not depend on the
 DiceBear API at runtime.
+
+`public/favicon.ico` reuses the `tiger.png` avatar from this attributed set.

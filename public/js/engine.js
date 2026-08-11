@@ -9,6 +9,7 @@ import { classify, canBeat, comboName, posName, findHint } from './rules.js';
 
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 6;
+export const TURN_SECONDS = 20;
 export const QUICK_PHRASES = ['心态崩了啊', '一个小单张，不走不健康', '快点吧，我等得花儿都谢了'];
 export const PASS_PHRASES = ['pass', '要不起', '不要'];
 export const INTERACTION_ITEMS = ['tomato', 'bucket'];
@@ -48,6 +49,8 @@ export class Game {
     this.lastInteraction = null;
     this.audioSeq = 0;
     this.lastAudioEvent = null;
+    this.turnStartedAt = null;
+    this.turnDeadline = null;
   }
 
   pushLog(msg) {
@@ -62,6 +65,7 @@ export class Game {
     this.lastInteraction ||= null;
     this.audioSeq ||= 0;
     this.lastAudioEvent ||= null;
+    if (this.phase === 'playing' && !Number.isFinite(this.turnDeadline)) this.resetTurnTimer();
     const usedAvatars = new Set();
     for (const player of this.players) {
       player.publicId ||= genPublicId();
@@ -247,6 +251,7 @@ export class Game {
     this.result = null;
     this.turn = this.dealer; // 庄家首出
     this.phase = 'playing';
+    this.resetTurnTimer();
     this.pushLog(`—— 第 ${this.round} 局开始，庄家：${this.players[this.dealer].name} ——`);
   }
 
@@ -263,7 +268,34 @@ export class Game {
     return s;
   }
 
-  play(id, ids) {
+  resetTurnTimer(now = Date.now()) {
+    this.turnStartedAt = now;
+    this.turnDeadline = now + TURN_SECONDS * 1000;
+  }
+
+  pauseTurnTimer() {
+    this.turnStartedAt = null;
+    this.turnDeadline = null;
+  }
+
+  turnExpired(now = Date.now()) {
+    return this.phase === 'playing' && Number.isFinite(this.turnDeadline) && now >= this.turnDeadline;
+  }
+
+  timeoutTurn(now = Date.now()) {
+    if (!this.turnExpired(now)) return false;
+    const seat = this.turn;
+    const player = this.players[seat];
+    if (!player || player.outRank !== null) return false;
+    if (this.pending) {
+      return this.pass(player.id, true) === null;
+    }
+    const card = findHint(player.hand, null)?.[0];
+    if (!card) return false;
+    return this.play(player.id, [card.id], true) === null;
+  }
+
+  play(id, ids, timeout = false) {
     if (this.phase !== 'playing') return '当前不在对局中';
     const seat = this.players.findIndex(p => p.id === id);
     const p = this.players[seat];
@@ -285,10 +317,12 @@ export class Game {
     p.hand = p.hand.filter(c => !ids.includes(c.id));
     this.pending = { seat, combo, cards };
     this.passStreak = 0;
-    this.lastActions[seat] = { type: 'play', cards, name: comboName(combo) };
+    this.lastActions[seat] = { type: 'play', cards, name: comboName(combo), timeout };
     const blackFivePlayed = cards.some(c => c.id === BLACK5_ID);
-    this.lastAudioEvent = { id: ++this.audioSeq, type: 'play', combo, blackFive: blackFivePlayed };
-    this.pushLog(`${p.name} 出 ${comboName(combo)}：${cards.map(cardLabel).join(' ')}`);
+    this.lastAudioEvent = { id: ++this.audioSeq, type: 'play', combo, blackFive: blackFivePlayed, timeout };
+    this.pushLog(timeout
+      ? `${p.name} 超时，自动出 ${comboName(combo)}：${cards.map(cardLabel).join(' ')}`
+      : `${p.name} 出 ${comboName(combo)}：${cards.map(cardLabel).join(' ')}`);
 
     // 黑桃5 一出手，身份自然暴露
     if (!this.blackFivePublic && blackFivePlayed) {
@@ -301,16 +335,16 @@ export class Game {
     return null;
   }
 
-  pass(id) {
+  pass(id, timeout = false) {
     if (this.phase !== 'playing') return '当前不在对局中';
     const seat = this.players.findIndex(p => p.id === id);
     if (this.turn !== seat) return '还没轮到你';
     if (!this.pending) return '本轮由你首出，必须出牌';
     this.passStreak++;
     const voice = PASS_PHRASES[Math.floor(Math.random() * PASS_PHRASES.length)];
-    this.lastActions[seat] = { type: 'pass', voice };
-    this.lastAudioEvent = { id: ++this.audioSeq, type: 'pass', text: voice };
-    this.pushLog(`${this.players[seat].name} 过牌`);
+    this.lastActions[seat] = { type: 'pass', voice, timeout };
+    this.lastAudioEvent = { id: ++this.audioSeq, type: 'pass', text: voice, timeout };
+    this.pushLog(timeout ? `${this.players[seat].name} 超时，已自动过牌` : `${this.players[seat].name} 过牌`);
     this.afterAction();
     return null;
   }
@@ -345,6 +379,7 @@ export class Game {
       if (this.passStreak >= active - (holderOut ? 0 : 1)) { this.endTrick(); return; }
     }
     this.turn = this.nextActive(this.turn);
+    this.resetTurnTimer();
   }
 
   endTrick() {
@@ -359,6 +394,7 @@ export class Game {
       this.turn = this.nextActive(ps);
       this.pushLog(`无人压牌，由 ${this.players[this.turn].name} 首出`);
     }
+    this.resetTurnTimer();
   }
 
   outSeat(seat) {
@@ -390,6 +426,7 @@ export class Game {
       return { name: p.name, pos: p.outRank, posName: posName(p.outRank, n), team: inA ? '庄家' : '闲家', delta, score: p.score };
     }).sort((a, b) => a.pos - b.pos);
     this.blackFivePublic = true; // 结算时公开黑五身份
+    this.pauseTurnTimer();
     this.result = { winTeam: this.winTeam, solo: this.solo, zeroRound, rows };
     this.phase = 'roundEnd';
     this.pushLog(zeroRound
@@ -413,6 +450,7 @@ export class Game {
     this.result = null;
     this.pending = null;
     this.lastActions = {};
+    this.pauseTurnTimer();
     this.players.forEach(p => { p.ready = !!p.isBot; p.score = 0; p.hand = []; p.outRank = null; p.voice = false; });
     this.pushLog('已返回大厅，积分清零');
     return null;
@@ -462,6 +500,10 @@ export class Game {
       chat: this.chat.slice(-30),
       lastInteraction: this.lastInteraction,
       audioEvent: this.lastAudioEvent,
+      serverNow: Date.now(),
+      turnStartedAt: this.phase === 'playing' ? this.turnStartedAt : null,
+      turnDeadline: this.phase === 'playing' ? this.turnDeadline : null,
+      turnSeconds: TURN_SECONDS,
       log: this.log.slice(-9),
       canStart: this.phase === 'lobby'
         && this.players.length >= MIN_PLAYERS

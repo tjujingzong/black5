@@ -25,10 +25,11 @@ Cloudflare Workers；每个房间由一个 SQLite-backed Durable Object 承载�
 - 点击其他玩家头像可发送番茄或水桶，所有客户端同步播放互动动画和音效。
 - 每局从本地头像素材库随机分配不重复头像，真人和人机在所有客户端保持一致。
 - 牌力从小到大为 `4、6、7、8、9、10、J、Q、K、A、2、3、5`，同牌型的 5 可以压 5。
-- 顺子和连对只允许 `4` 到 `A`，最大三张顺子为 `Q-K-A`，`K-A-2` 不成立。
+- 顺子和连对使用独立序列 `2、3、4、6、7、8、9、10、J、Q、K、A`；`2-3-4` 最小、`Q-K-A` 最大，`5` 不参与且不能首尾循环。
 - 庄家不是大落时本局所有玩家记 `0` 分；庄家大落时按名次正常结算。
 - 大尺寸中央牌桌将其他玩家分布在边缘，当前一手牌集中显示在桌心。
-- 操作音效由 Web Audio 生成；BGM 使用本地免费许可曲目循环播放，可在房间右上角关闭。
+- 每回合由 Durable Object 维护 20 秒权威倒计时；超时自动过牌，必须首出时自动打出最小单张。
+- 操作音效由 Web Audio 生成，并针对移动浏览器预热 AudioContext 和快捷语音；BGM 从三首本地免费许可曲目中无重复随机循环。
 
 ## 项目结构
 
@@ -37,8 +38,8 @@ public/                 浏览器静态资源
   index.html
   css/style.css
   audio/
-    bassa-island-game-loop.mp3  免费许可循环 BGM
-    ATTRIBUTION.md              音乐署名与许可证
+    *.mp3               三首免费许可 BGM
+    ATTRIBUTION.md      音乐署名与许可证
   avatars/                      本地 PNG 头像素材与许可说明
   js/
     main.js             页面入口与断线重连
@@ -96,8 +97,8 @@ npm run deploy
 
 ## 音乐许可
 
-背景音乐使用 Kevin MacLeod 的 **Bassa Island Game Loop**，依据
-[Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/) 使用。
+背景音乐使用 Kevin MacLeod 的 **Bassa Island Game Loop**、**Funk Game Loop** 和
+**Voxel Revolution**，依据 [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/) 使用。
 完整署名见 [`public/audio/ATTRIBUTION.md`](public/audio/ATTRIBUTION.md)。
 
 头像素材通过 DiceBear 的 **Adventurer** 风格生成，原画作者 Lisa Wischofsky，依据

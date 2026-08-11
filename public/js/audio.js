@@ -4,6 +4,13 @@ const AudioContextClass = globalThis.AudioContext || globalThis.webkitAudioConte
 const LEGACY_AUDIO_KEY = 'jh5-audio-enabled';
 const MUSIC_KEY = 'jh5-music-enabled';
 const EFFECTS_KEY = 'jh5-effects-enabled';
+const MUSIC_VOLUME = 0.18;
+
+export const MUSIC_TRACKS = [
+  { src: '/audio/bassa-island-game-loop.mp3', title: 'Bassa Island Game Loop' },
+  { src: '/audio/funk-game-loop.mp3', title: 'Funk Game Loop' },
+  { src: '/audio/voxel-revolution.mp3', title: 'Voxel Revolution' },
+];
 
 class GameAudio {
   constructor() {
@@ -22,19 +29,36 @@ class GameAudio {
     this.effectsButton = null;
     this.lastState = null;
     this.speechDepth = 0;
+    this.userActivated = false;
+    this.speechPrimed = false;
+    this.pendingEffects = [];
+    this.pendingSpeech = [];
+    this.musicQueue = [];
+    this.currentTrack = -1;
+    this.musicRetry = 0;
   }
 
   init() {
-    this.music = new Audio('/audio/bassa-island-game-loop.mp3');
-    this.music.loop = true;
+    this.music = new Audio();
+    this.music.loop = false;
     this.music.preload = 'auto';
-    this.music.volume = 0.2;
+    this.music.volume = MUSIC_VOLUME;
+    this.music.addEventListener('ended', () => this.nextMusic(true));
+    this.music.addEventListener('playing', () => { this.musicRetry = 0; });
+    this.music.addEventListener('error', () => {
+      if (!this.musicEnabled || ++this.musicRetry > MUSIC_TRACKS.length) return;
+      this.nextMusic(true);
+    });
+    this.nextMusic(false);
     this.musicButton = document.getElementById('btn-music');
     this.effectsButton = document.getElementById('btn-effects');
     this.updateButtons();
     this.musicButton.addEventListener('click', () => this.toggleMusic());
     this.effectsButton.addEventListener('click', () => this.toggleEffects());
-    document.addEventListener('pointerdown', () => this.unlock(), { capture: true });
+    const unlock = () => this.unlock(true);
+    document.addEventListener('pointerdown', unlock, { capture: true });
+    document.addEventListener('touchstart', unlock, { capture: true, passive: true });
+    document.addEventListener('keydown', unlock, { capture: true });
     document.addEventListener('click', event => {
       if (event.target.closest('#btn-music, #btn-effects')) return;
       if (event.target.closest('[data-card]')) this.play('card');
@@ -42,11 +66,19 @@ class GameAudio {
     });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.stopMusic();
-      else if (this.musicEnabled) this.startMusic();
+      else {
+        globalThis.speechSynthesis?.resume();
+        this.unlock(false);
+        if (this.musicEnabled) this.startMusic();
+      }
     });
   }
 
-  async unlock() {
+  unlock(userGesture = true) {
+    if (userGesture) {
+      this.userActivated = true;
+      this.primeSpeech();
+    }
     if (this.effectsEnabled && AudioContextClass && !this.context) {
       this.context = new AudioContextClass();
       this.master = this.context.createGain();
@@ -55,9 +87,33 @@ class GameAudio {
       this.effectGain.gain.value = 0.5;
       this.effectGain.connect(this.master);
       this.master.connect(this.context.destination);
+      // Starting a silent source inside the gesture is required by older iOS Safari.
+      const source = this.context.createBufferSource();
+      source.buffer = this.context.createBuffer(1, 1, this.context.sampleRate);
+      source.connect(this.effectGain);
+      source.start(0);
     }
-    if (this.effectsEnabled && this.context?.state === 'suspended') await this.context.resume();
+    const resumed = this.effectsEnabled && this.context?.state === 'suspended'
+      ? this.context.resume().catch(() => {})
+      : Promise.resolve();
+    resumed.then(() => {
+      if (this.context?.state === 'running') this.flushEffects();
+      this.flushSpeech();
+    });
     if (this.musicEnabled) this.startMusic();
+  }
+
+  primeSpeech() {
+    if (this.speechPrimed || !globalThis.speechSynthesis || !globalThis.SpeechSynthesisUtterance) return;
+    this.speechPrimed = true;
+    try {
+      globalThis.speechSynthesis.resume();
+      const primer = new SpeechSynthesisUtterance(' ');
+      primer.volume = 0;
+      globalThis.speechSynthesis.speak(primer);
+    } catch (e) {
+      this.speechPrimed = false;
+    }
   }
 
   toggleMusic() {
@@ -76,20 +132,29 @@ class GameAudio {
       this.master.gain.setTargetAtTime(this.effectsEnabled ? 0.9 : 0.0001, this.context.currentTime, 0.015);
     }
     if (this.effectsEnabled) this.unlock();
-    else globalThis.speechSynthesis?.cancel();
+    else {
+      this.pendingEffects = [];
+      this.pendingSpeech = [];
+      globalThis.speechSynthesis?.cancel();
+    }
   }
 
   updateButtons() {
     if (this.musicButton) {
-      this.musicButton.textContent = this.musicEnabled ? '♫' : '♪';
+      const icon = this.musicButton.querySelector('span');
+      if (icon) icon.textContent = this.musicEnabled ? '♫' : '♪';
+      else this.musicButton.textContent = this.musicEnabled ? '♫' : '♪';
       this.musicButton.classList.toggle('active', this.musicEnabled);
       this.musicButton.setAttribute('aria-pressed', String(this.musicEnabled));
-      const label = this.musicEnabled ? '关闭背景音乐' : '开启背景音乐';
+      const track = MUSIC_TRACKS[this.currentTrack]?.title;
+      const label = this.musicEnabled ? `关闭背景音乐${track ? `（${track}）` : ''}` : '开启背景音乐';
       this.musicButton.setAttribute('aria-label', label);
       this.musicButton.title = label;
     }
     if (this.effectsButton) {
-      this.effectsButton.textContent = this.effectsEnabled ? '🔊' : '🔇';
+      const icon = this.effectsButton.querySelector('span');
+      if (icon) icon.textContent = this.effectsEnabled ? '🔊' : '🔇';
+      else this.effectsButton.textContent = this.effectsEnabled ? '🔊' : '🔇';
       this.effectsButton.classList.toggle('active', this.effectsEnabled);
       this.effectsButton.setAttribute('aria-pressed', String(this.effectsEnabled));
       const label = this.effectsEnabled ? '关闭牌局音效' : '开启牌局音效';
@@ -100,11 +165,31 @@ class GameAudio {
 
   startMusic() {
     if (!this.musicEnabled || !this.music || document.hidden || !this.music.paused) return;
+    if (!this.music.src) this.nextMusic(false);
     this.music.play().catch(() => {});
   }
 
   stopMusic() {
     this.music?.pause();
+  }
+
+  nextMusic(autoplay) {
+    if (!this.music) return;
+    if (!this.musicQueue.length) {
+      this.musicQueue = MUSIC_TRACKS.map((_, index) => index);
+      for (let i = this.musicQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [this.musicQueue[i], this.musicQueue[j]] = [this.musicQueue[j], this.musicQueue[i]];
+      }
+      if (this.musicQueue.length > 1 && this.musicQueue[0] === this.currentTrack) {
+        [this.musicQueue[0], this.musicQueue[1]] = [this.musicQueue[1], this.musicQueue[0]];
+      }
+    }
+    this.currentTrack = this.musicQueue.shift();
+    this.music.src = MUSIC_TRACKS[this.currentTrack].src;
+    this.music.load();
+    this.updateButtons();
+    if (autoplay && this.musicEnabled && !document.hidden) this.music.play().catch(() => {});
   }
 
   voice(frequency, start, duration, volume, type, destination) {
@@ -144,7 +229,13 @@ class GameAudio {
   }
 
   play(name) {
-    if (!this.effectsEnabled || !this.context || this.context.state !== 'running') return;
+    if (!this.effectsEnabled) return;
+    if (!this.context || this.context.state !== 'running') {
+      this.pendingEffects.push(name);
+      if (this.pendingEffects.length > 8) this.pendingEffects.shift();
+      if (this.userActivated) this.unlock(false);
+      return;
+    }
     const now = this.context.currentTime;
     const tone = (frequency, offset, duration, volume = 0.18, type = 'sine') =>
       this.voice(frequency, now + offset, duration, volume, type, this.effectGain);
@@ -175,6 +266,11 @@ class GameAudio {
     }
   }
 
+  flushEffects() {
+    const pending = this.pendingEffects.splice(0);
+    for (const name of pending) this.play(name);
+  }
+
   announce(combo) {
     const text = comboSpeech(combo);
     if (text) this.speak(text);
@@ -182,6 +278,11 @@ class GameAudio {
 
   speak(text) {
     if (!this.effectsEnabled || !text || !globalThis.speechSynthesis || !globalThis.SpeechSynthesisUtterance) return;
+    if (!this.userActivated) {
+      this.pendingSpeech.push(text);
+      if (this.pendingSpeech.length > 6) this.pendingSpeech.shift();
+      return;
+    }
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = speechLanguage(text);
     utterance.rate = 1.08;
@@ -198,11 +299,17 @@ class GameAudio {
     };
     const restore = () => {
       this.speechDepth = Math.max(0, this.speechDepth - 1);
-      if (this.music && this.speechDepth === 0) this.music.volume = 0.2;
+      if (this.music && this.speechDepth === 0) this.music.volume = MUSIC_VOLUME;
     };
     utterance.onend = restore;
     utterance.onerror = restore;
     speechSynthesis.speak(utterance);
+  }
+
+  flushSpeech() {
+    if (!this.userActivated || !this.effectsEnabled) return;
+    const pending = this.pendingSpeech.splice(0);
+    for (const text of pending) this.speak(text);
   }
 
   observe(view) {

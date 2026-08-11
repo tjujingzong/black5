@@ -10,6 +10,9 @@ const selected = new Set(); // 选中的手牌 id
 let chatDraft = '';
 let socialTarget = null;
 let lastInteractionId = 0;
+let serverClockOffset = 0;
+
+setInterval(updateTurnClocks, 250);
 
 export function bindSend(fn) { send = fn; }
 export function setRoomInfo(code) {
@@ -104,6 +107,14 @@ function handleAct(act, button = null) {
       break;
     }
     case 'quick': send({ t: 'quick', text: button.dataset.text }); break;
+    case 'pass': {
+      const myTurn = v.phase === 'playing' && v.turnSeat === v.mySeat;
+      if (!myTurn) return toast('还没轮到你出牌');
+      if (!v.pending) return toast('本轮由你首出，不能过牌');
+      send({ t: 'pass' });
+      selected.clear();
+      break;
+    }
     case 'interact': {
       send({ t: 'interact', to: button.dataset.to, item: button.dataset.item });
       socialTarget = null;
@@ -124,14 +135,7 @@ function handleAct(act, button = null) {
     }
     case 'play': {
       const cards = v.myHand.filter(c => selected.has(c.id));
-      if (!cards.length) {
-        const myTurn = v.phase === 'playing' && v.turnSeat === v.mySeat;
-        if (myTurn && v.pending) {
-          send({ t: 'pass' });
-          return;
-        }
-        return toast('请先选择要出的牌');
-      }
+      if (!cards.length) return toast('请先选择要出的牌');
       const combo = classify(cards);
       if (!combo) return toast('不是合法牌型');
       if (v.pending && v.pending.seat !== v.mySeat && !canBeat(combo, v.pending.combo)) {
@@ -148,6 +152,7 @@ function handleAct(act, button = null) {
 
 export function render(v) {
   cur = v;
+  if (Number.isFinite(v.serverNow)) serverClockOffset = v.serverNow - Date.now();
   const chatWasFocused = document.activeElement?.matches?.('[data-chat-input]');
   // 清理已不在手牌中的选中项
   const ids = new Set(v.myHand.map(c => c.id));
@@ -164,9 +169,9 @@ export function render(v) {
     html += gameHtml(v);
     if (v.phase === 'roundEnd' && v.result) html += resultHtml(v);
   }
-  html += chatHtml(v);
-  html += `<div class="logbox"><ul>${v.log.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>`;
+  html += `<div class="support-grid">${chatHtml(v)}${logHtml(v)}</div>`;
   body.innerHTML = html;
+  updateTurnClocks();
   const messages = body.querySelector('.chat-messages');
   if (messages) messages.scrollTop = messages.scrollHeight;
   if (chatWasFocused) {
@@ -180,9 +185,10 @@ function lobbyHtml(v) {
   const me = v.players.find(p => p.isMe);
   const botCount = v.players.filter(p => p.isBot).length;
   const list = v.players.map(p => `
-    <li class="${p.connected ? '' : 'off'}">
-      <span class="pname"><img class="lobby-avatar" src="${avatarSrc(p.avatar)}" alt="">${esc(p.name)}${p.isMe ? '（我）' : ''}</span>
-      <span class="pstate">${p.isBot ? '人机 · 已准备' : p.isRoomOwner ? '房主' : p.ready ? '已准备' : '未准备'}</span>
+    <li class="lobby-player${p.connected ? '' : ' off'}">
+      <img class="lobby-avatar" src="${avatarSrc(p.avatar)}" alt="">
+      <span class="pname">${esc(p.name)}${p.isMe ? '<small>我</small>' : ''}</span>
+      <span class="pstate${p.ready || p.isBot ? ' ready' : ''}">${p.isBot ? '人机' : p.isRoomOwner ? '房主' : p.ready ? '已准备' : '未准备'}</span>
     </li>`).join('');
   const actions = v.isHost
     ? `<div class="bot-actions">
@@ -190,12 +196,12 @@ function lobbyHtml(v) {
          <button data-act="removeBot" ${botCount ? '' : 'disabled'}>移除人机</button>
        </div>
        <button class="primary big" data-act="start" ${v.canStart ? '' : 'disabled'}>开始游戏</button>
-       <p class="tip">${v.canStart ? '全员已准备，可以开局！' : `等待玩家准备（需 ${v.minPlayers}~${v.maxPlayers} 人，推荐 5 人）`}</p>`
+       <p class="tip">${v.canStart ? '可以开局' : `${v.players.length}/${v.maxPlayers} 人 · 至少 ${v.minPlayers} 人`}</p>`
     : `<button class="primary big" data-act="ready">${me.ready ? '取消准备' : '准备'}</button>
        <p class="tip">等待房主开始游戏…</p>`;
   return `<div class="lobby">
-    <h2>房间 ${esc(roomCode)}</h2>
-    <p class="tip">把房间号或右上角的邀请链接发给朋友即可加入</p>
+    <div class="lobby-heading"><div><span class="eyebrow">牌局大厅</span><h2>等待玩家</h2></div><b>${v.players.length}<small> / ${v.maxPlayers}</small></b></div>
+    <div class="invite-strip"><span>房间号</span><strong>${esc(roomCode)}</strong><span>分享右上角邀请按钮</span></div>
     <ul class="plist">${list}</ul>
     <div class="actions-col">${actions}</div>
   </div>`;
@@ -217,6 +223,7 @@ function gameHtml(v) {
   }[opponents.length] || [];
   const chips = opponents.map((player, index) => chipHtml(v, player, positions[index])).join('');
   const myTurn = v.phase === 'playing' && v.turnSeat === v.mySeat;
+  const clock = turnClockHtml(v, myTurn);
 
   const center = v.pending
     ? `<div class="trick-owner"><b>${seatName(v.pending.seat)}</b><span>${v.pending.name}</span></div>
@@ -224,7 +231,9 @@ function gameHtml(v) {
     : `<div class="table-empty">${myTurn ? '由你首出' : `等待 ${seatName(v.turnSeat)} 出牌`}</div>`;
 
   const myLa = v.lastActions[v.mySeat];
-  const myAct = myLa ? (myLa.type === 'pass' ? '你：过牌' : `你：${myLa.cards.map(mini).join('')}`) : '';
+  const myAct = myLa ? (myLa.type === 'pass'
+    ? `你：${myLa.timeout ? '超时过牌' : '过牌'}`
+    : `你：${myLa.timeout ? '超时出牌 ' : ''}${myLa.cards.map(mini).join('')}`) : '';
 
   let secret = '';
   if (v.mySecret) {
@@ -239,21 +248,22 @@ function gameHtml(v) {
     </div>`).join('');
 
   const canPass = myTurn && !!v.pending;
-  const playLabel = selected.size > 0 ? '出牌' : canPass ? '过牌' : '出牌';
   const status = v.phase !== 'playing' ? '本局已结束' : myTurn ? '轮到你出牌' : `等待 ${seatName(v.turnSeat)} 出牌`;
   const me = v.players[v.mySeat];
 
   return `<div class="game">
-    <div class="topline">
-      <span>第 ${v.round} 局</span><span>庄家：${seatName(v.dealerSeat)}</span><span>${status}</span>
+    <div class="game-statusbar">
+      <div><small>局数</small><b>第 ${v.round} 局</b></div>
+      <div><small>庄家</small><b>${seatName(v.dealerSeat)}</b></div>
+      <div class="round-status${myTurn ? ' mine' : ''}"><small>当前</small><b>${status}</b></div>
     </div>
     ${offline.length ? `<div class="banner">⚠ ${offline.map(p => esc(p.name)).join('、')} 掉线，等待重新连接…</div>` : ''}
     <div class="table-wrap">
       <div class="table-felt">
         ${chips}
         <div class="table-center">
+          ${clock}
           ${center}
-          <div class="table-turn${myTurn ? ' mine' : ''}">${status}</div>
         </div>
       </div>
     </div>
@@ -266,9 +276,10 @@ function gameHtml(v) {
       <div class="myact">${myAct}</div>
       <div class="hand">${hand}</div>
       <div class="controls">
-        <button data-act="hint" ${myTurn ? '' : 'disabled'}>提示</button>
+        <button class="hint-button" data-act="hint" ${myTurn ? '' : 'disabled'}>提示</button>
+        <button class="pass-button" data-act="pass" ${canPass ? '' : 'disabled'}>过牌</button>
         ${v.canReveal ? '<button class="accent" data-act="reveal">明牌：我是黑五</button>' : ''}
-        <button class="primary" data-act="play" ${myTurn ? '' : 'disabled'}>${playLabel}</button>
+        <button class="primary play-button" data-act="play" ${myTurn ? '' : 'disabled'}>出牌${selected.size ? ` · ${selected.size}` : ''}</button>
       </div>
     </div>
     ${propMenuHtml(v)}
@@ -293,7 +304,9 @@ function chipHtml(v, p, position) {
     ? `<span class="meta finish">${posName(p.outRank, v.n)}</span>`
     : `<span class="meta">${p.count} 张</span>`;
   const act = la
-    ? (la.type === 'pass' ? '<span class="act pass">过牌</span>' : '<span class="act">已出牌</span>')
+    ? (la.type === 'pass'
+      ? `<span class="act pass">${la.timeout ? '超时过牌' : '过牌'}</span>`
+      : `<span class="act">${la.timeout ? '超时出牌' : '已出牌'}</span>`)
     : '';
   return `<div class="${cls.join(' ')}">
     <button class="avatar" data-player-id="${esc(p.id)}" data-avatar-id="${esc(p.id)}" aria-label="向${esc(p.name)}使用道具" title="向${esc(p.name)}使用道具"><img src="${avatarSrc(p.avatar)}" alt=""></button>
@@ -328,7 +341,7 @@ function chatHtml(v) {
       <b>${esc(message.name)}</b><span>${message.quick ? '🔊 ' : ''}${esc(message.text)}</span>
     </div>`).join('');
   const quick = QUICK_PHRASES.map(text => `<button data-act="quick" data-text="${esc(text)}">${esc(text)}</button>`).join('');
-  return `<section class="chat-panel">
+  return `<section class="chat-panel support-panel">
     <div class="chat-head"><b>房间聊天</b><div class="quick-phrases">${quick}</div></div>
     <div class="chat-messages">${messages || '<span class="chat-empty">还没有消息</span>'}</div>
     <div class="chat-compose">
@@ -336,6 +349,35 @@ function chatHtml(v) {
       <button class="primary" data-act="sendChat">发送</button>
     </div>
   </section>`;
+}
+
+function logHtml(v) {
+  return `<details class="logbox support-panel" open>
+    <summary>牌局记录</summary>
+    <ul>${v.log.map(line => `<li>${esc(line)}</li>`).join('')}</ul>
+  </details>`;
+}
+
+function turnClockHtml(v, mine) {
+  if (v.phase !== 'playing' || !Number.isFinite(v.turnDeadline)) return '';
+  return `<div class="turn-clock${mine ? ' mine' : ''}" data-turn-deadline="${v.turnDeadline}" data-turn-seconds="${v.turnSeconds || 20}" role="timer" aria-label="出牌倒计时">
+    <span>20</span><small>秒</small>
+  </div>`;
+}
+
+function updateTurnClocks() {
+  const serverNow = Date.now() + serverClockOffset;
+  document.querySelectorAll('[data-turn-deadline]').forEach(clock => {
+    const deadline = Number(clock.dataset.turnDeadline);
+    const duration = Number(clock.dataset.turnSeconds || 20) * 1000;
+    const remaining = Math.max(0, deadline - serverNow);
+    const seconds = Math.ceil(remaining / 1000);
+    clock.style.setProperty('--turn-angle', `${Math.max(0, Math.min(1, remaining / duration)) * 360}deg`);
+    clock.classList.toggle('urgent', seconds <= 5);
+    const number = clock.querySelector('span');
+    if (number) number.textContent = String(seconds);
+    clock.setAttribute('aria-label', `出牌倒计时 ${seconds} 秒`);
+  });
 }
 
 export function showInteraction(event) {
