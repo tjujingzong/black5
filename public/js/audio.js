@@ -155,6 +155,11 @@ class GameAudio {
       case 'ready': tone(440, 0, 0.08); tone(554.37, 0.07, 0.11); break;
       case 'play': tone(196, 0, 0.09, 0.2, 'triangle'); tone(246.94, 0.065, 0.12, 0.14); break;
       case 'pass': tone(260, 0, 0.06, 0.08); tone(190, 0.05, 0.1, 0.08, 'triangle'); break;
+      case 'blackFive':
+        tone(110, 0, 0.3, 0.24, 'sawtooth');
+        tone(164.81, 0.12, 0.34, 0.2, 'square');
+        tone(220, 0.27, 0.42, 0.22, 'sawtooth');
+        break;
       case 'turn': tone(523.25, 0, 0.13); tone(659.25, 0.11, 0.18); break;
       case 'start': tone(261.63, 0, 0.16); tone(329.63, 0.1, 0.18); tone(392, 0.2, 0.24); break;
       case 'result': tone(392, 0, 0.2); tone(523.25, 0.12, 0.22); tone(659.25, 0.24, 0.3); break;
@@ -226,8 +231,15 @@ class GameAudio {
     if (action?.type === 'play') {
       this.play('play');
       this.announce(action.combo);
+      if (action.blackFive) {
+        this.play('blackFive');
+        this.speak('黑五现身');
+      }
     } else if (action?.type === 'pass') {
       this.play('pass');
+      this.speak(action.text);
+    } else if (action?.type === 'blackFive') {
+      this.play('blackFive');
       this.speak(action.text);
     }
     if (previous.phase !== 'roundEnd' && next.phase === 'roundEnd') this.play('result');

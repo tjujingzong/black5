@@ -286,11 +286,12 @@ export class Game {
     this.pending = { seat, combo, cards };
     this.passStreak = 0;
     this.lastActions[seat] = { type: 'play', cards, name: comboName(combo) };
-    this.lastAudioEvent = { id: ++this.audioSeq, type: 'play', combo };
+    const blackFivePlayed = cards.some(c => c.id === BLACK5_ID);
+    this.lastAudioEvent = { id: ++this.audioSeq, type: 'play', combo, blackFive: blackFivePlayed };
     this.pushLog(`${p.name} 出 ${comboName(combo)}：${cards.map(cardLabel).join(' ')}`);
 
     // 黑桃5 一出手，身份自然暴露
-    if (!this.blackFivePublic && cards.some(c => c.id === BLACK5_ID)) {
+    if (!this.blackFivePublic && blackFivePlayed) {
       this.blackFivePublic = true;
       this.pushLog(`黑桃5现身！${p.name} 就是黑五`);
     }
@@ -329,6 +330,7 @@ export class Game {
     if (seat !== this.blackFiveSeat) return '你没有可亮的身份';
     if (this.blackFivePublic) return '身份已经公开了';
     this.blackFivePublic = true;
+    this.lastAudioEvent = { id: ++this.audioSeq, type: 'blackFive', text: '黑五现身' };
     this.pushLog(`${this.players[seat].name} 亮出黑桃5：我就是黑五！`);
     return null;
   }

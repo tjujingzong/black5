@@ -16,14 +16,17 @@ ok(classify([C(7)]).kind === 'single', '单张');
 ok(classify([C(9, 0), C(9, 1)]).kind === 'pair', '对子');
 ok(classify([C(9, 0), C(9, 1), C(9, 2)]).kind === 'triple', '三张=炸弹');
 ok(classify([C(9, 0), C(9, 1), C(9, 2), C(9, 3)]).kind === 'quad', '四张=轰牌');
+ok(classify([C(15), C(3), C(4)]).kind === 'straight', '2-3-4 是最小顺子');
+ok(classify([C(3), C(4), C(6)]).kind === 'straight', '3-4-6 顺子合法');
 ok(classify([C(4), C(6), C(7)]).kind === 'straight', '4-6-7 顺子合法');
 ok(classify([C(12), C(13), C(14)]).kind === 'straight', 'Q-K-A 是最大顺子');
 ok(classify([C(13), C(14), C(15)]) === null, 'K-A-2 不是顺子');
-ok(classify([C(12), C(13), C(14), C(15)]) === null, '顺子不能包含 2');
-ok(classify([C(15), C(3), C(5)]) === null, '2-3-5 不是顺子');
-ok(classify([C(3), C(5), C(4)]) === null, '牌力首尾不能循环成顺子');
+ok(classify([C(15), C(3), C(4), C(6)]).kind === 'straight', '2-3-4-6 长顺子合法');
+ok(classify([C(15), C(3), C(5)]) === null, '含 5 的组合不是顺子');
+ok(classify([C(3), C(5), C(4)]) === null, '5 不参与顺子');
 ok(classify([C(13, 0), C(13, 1), C(14, 2), C(14, 3)]).kind === 'pairs', 'K-A 连对合法');
-ok(classify([C(14, 0), C(14, 1), C(15, 2), C(15, 3)]) === null, 'A-2 不是连对');
+ok(classify([C(15, 0), C(15, 1), C(3, 2), C(3, 3)]).kind === 'pairs', '对2-对3 连对合法');
+ok(classify([C(14, 0), C(14, 1), C(15, 2), C(15, 3)]) === null, '对A-对2 不是连对');
 ok(classify([C(3), C(5), C(7)]) === null, '不连续不是顺子');
 
 console.log('== 比大小 ==');
@@ -31,6 +34,8 @@ ok(canBeat({ kind: 'triple', rank: 5, len: 3 }, { kind: 'straight', rank: 14, le
 ok(canBeat({ kind: 'quad', rank: 4, len: 4 }, { kind: 'triple', rank: 14, len: 3 }), '轰牌压炸弹');
 ok(!canBeat({ kind: 'single', rank: 15, len: 1 }, { kind: 'single', rank: 15, len: 1 }), '同点不能压');
 ok(!canBeat({ kind: 'straight', rank: 10, len: 4 }, { kind: 'straight', rank: 10, len: 5 }), '不同长度顺子不能互压');
+ok(canBeat({ kind: 'straight', rank: 6, len: 3 }, { kind: 'straight', rank: 4, len: 3 }), '3-4-6 能压 2-3-4');
+ok(!canBeat({ kind: 'straight', rank: 4, len: 3 }, { kind: 'straight', rank: 14, len: 3 }), '2-3-4 不能压 Q-K-A');
 ok(canBeat({ kind: 'pair', rank: 15, len: 2 }, { kind: 'pair', rank: 14, len: 2 }), '对2 > 对A');
 ok(canBeat({ kind: 'single', rank: 3, len: 1 }, { kind: 'single', rank: 15, len: 1 }), '3 > 2');
 ok(canBeat({ kind: 'single', rank: 5, len: 1 }, { kind: 'single', rank: 4, len: 1 }), '5 > 4');
@@ -44,6 +49,13 @@ ok(ordered.map(c => c.rank).join(',') === '4,6,14,15,3,5', '手牌按 4、6…A�
 
 const fiveHint = findHint([C(5, 1)], { kind: 'single', rank: 5, len: 1 });
 ok(fiveHint && fiveHint[0].rank === 5, '提示能找到另一张 5 压 5');
+const lowStraightHint = findHint([C(15), C(3), C(4)], null);
+ok(lowStraightHint && lowStraightHint.length === 1, '首出提示仍优先最小单张');
+const nextStraightHint = findHint(
+  [C(3), C(4), C(6), C(8)],
+  { kind: 'straight', rank: 4, len: 3 },
+);
+ok(nextStraightHint?.map(card => card.rank).join(',') === '3,4,6', '顺子提示能用 3-4-6 压 2-3-4');
 
 console.log('== 出牌播报 ==');
 for (const rank of [15, 3, 4, 5]) {
@@ -56,6 +68,37 @@ ok(comboSpeech({ kind: 'triple', rank: 9 }) === '三个9，炸弹', '三张炸�
 ok(comboSpeech({ kind: 'quad', rank: 10 }) === '四个10，轰牌', '四张轰牌播报');
 ok(speechLanguage('pass') === 'en-US' && speechLanguage('要不起') === 'zh-CN'
   && speechLanguage('5') === 'zh-CN', '过牌语音自动选择中英文发音，牌面数字保持中文');
+
+console.log('== 客户端黑五音效 ==');
+globalThis.localStorage = { getItem: () => null, setItem: () => {} };
+const { gameAudio } = await import('./public/js/audio.js');
+const blackFiveTones = [];
+gameAudio.context = { state: 'running', currentTime: 10 };
+gameAudio.effectGain = {};
+gameAudio.effectsEnabled = true;
+gameAudio.voice = (...args) => blackFiveTones.push(args);
+gameAudio.play('blackFive');
+ok(blackFiveTones.length === 3, '黑五专属音效包含三段警示音色');
+
+const audioCalls = [];
+const spoken = [];
+gameAudio.play = name => audioCalls.push(name);
+gameAudio.speak = text => spoken.push(text);
+gameAudio.announce = combo => audioCalls.push(`announce:${combo.kind}`);
+const audioView = {
+  phase: 'playing', round: 1, players: [], turnSeat: 0, mySeat: 0,
+  pending: null, chat: [], lastInteraction: null, audioEvent: null,
+};
+gameAudio.lastState = null;
+gameAudio.observe(audioView);
+gameAudio.observe({ ...audioView, audioEvent: { id: 1, type: 'blackFive', text: '黑五现身' } });
+gameAudio.observe({
+  ...audioView,
+  audioEvent: { id: 2, type: 'play', combo: { kind: 'single', rank: 5, len: 1 }, blackFive: true },
+});
+ok(audioCalls.filter(name => name === 'blackFive').length === 2
+  && spoken.filter(text => text === '黑五现身').length === 2,
+  '自爆黑五与打出黑桃5都会触发专属音效和语音');
 
 console.log('== 计分与人机 ==');
 const zeroGame = new Game();
@@ -134,6 +177,28 @@ ok(passGame.pass(passIds[0]) === null
   && passGame.lastAudioEvent.type === 'pass'
   && PASS_PHRASES.includes(passGame.lastAudioEvent.text)
   && passGame.lastActions[0].voice === passGame.lastAudioEvent.text, '过牌随机播报会写入权威音频事件');
+
+const revealGame = new Game();
+const revealIds = ['甲', '乙', '丙'].map(name => revealGame.join(name).player.id);
+revealGame.phase = 'playing';
+revealGame.blackFiveSeat = 0;
+ok(revealGame.reveal(revealIds[0]) === null
+  && revealGame.blackFivePublic
+  && revealGame.lastAudioEvent.type === 'blackFive'
+  && revealGame.lastAudioEvent.text === '黑五现身', '自爆黑五会生成同步音效事件');
+
+const blackFiveGame = new Game();
+const blackFiveIds = ['甲', '乙', '丙'].map(name => blackFiveGame.join(name).player.id);
+blackFiveGame.phase = 'playing';
+blackFiveGame.turn = 0;
+blackFiveGame.blackFiveSeat = 0;
+blackFiveGame.players[0].hand = [C(5)];
+blackFiveGame.players[1].hand = [C(6)];
+blackFiveGame.players[2].hand = [C(7)];
+ok(blackFiveGame.play(blackFiveIds[0], [BLACK5_ID]) === null
+  && blackFiveGame.blackFivePublic
+  && blackFiveGame.lastAudioEvent.type === 'play'
+  && blackFiveGame.lastAudioEvent.blackFive === true, '打出黑桃5会生成专属音效标记');
 
 console.log('== 整局模拟（随机 20 局）==');
 for (let t = 0; t < 20; t++) {

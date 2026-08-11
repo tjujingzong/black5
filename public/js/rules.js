@@ -9,14 +9,20 @@ function sortRanks(ranks) {
   return ranks.sort((a, b) => rankStrength(a) - rankStrength(b));
 }
 
+const SEQUENCE_STRENGTH = new Map(SEQUENCE_ORDER.map((rank, index) => [rank, index]));
+
+function sortSequenceRanks(ranks) {
+  return ranks.sort((a, b) => (SEQUENCE_STRENGTH.get(a) ?? Infinity) - (SEQUENCE_STRENGTH.get(b) ?? Infinity));
+}
+
 function rankCanBeat(a, b) {
   return rankStrength(a) > rankStrength(b) || (a === 5 && b === 5);
 }
 
 function consecutive(ranks) {
-  if (ranks.some(rank => !SEQUENCE_ORDER.includes(rank))) return false;
+  if (ranks.some(rank => !SEQUENCE_STRENGTH.has(rank))) return false;
   for (let i = 1; i < ranks.length; i++) {
-    if (rankStrength(ranks[i]) !== rankStrength(ranks[i - 1]) + 1) return false;
+    if (SEQUENCE_STRENGTH.get(ranks[i]) !== SEQUENCE_STRENGTH.get(ranks[i - 1]) + 1) return false;
   }
   return true;
 }
@@ -36,14 +42,15 @@ export function classify(cards) {
     return null;
   }
 
-  if (n >= 3 && uniq.length === n && consecutive(uniq)) {
-    return { kind: 'straight', rank: uniq[uniq.length - 1], len: n };
+  const sequenceRanks = sortSequenceRanks([...uniq]);
+  if (n >= 3 && uniq.length === n && consecutive(sequenceRanks)) {
+    return { kind: 'straight', rank: sequenceRanks[sequenceRanks.length - 1], len: n };
   }
 
   if (n >= 4 && n % 2 === 0) {
     const count = new Map();
     for (const rank of ranks) count.set(rank, (count.get(rank) || 0) + 1);
-    const pairRanks = sortRanks([...count.keys()]);
+    const pairRanks = sortSequenceRanks([...count.keys()]);
     if ([...count.values()].every(value => value === 2) && consecutive(pairRanks)) {
       return { kind: 'pairs', rank: pairRanks[pairRanks.length - 1], len: n };
     }
