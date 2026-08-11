@@ -5,16 +5,22 @@
 // - 头科（第一个出完）所在阵营获胜，之后继续决出全部名次用于计分
 
 import { makeDeck, shuffle, sortHand, cardLabel, BLACK5_ID } from './cards.js';
-import { classify, canBeat, comboName, posName } from './rules.js';
+import { classify, canBeat, comboName, posName, findHint } from './rules.js';
 
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 6;
+export const QUICK_PHRASES = ['心态崩了啊', '一个小单张', '不走不健康', '快点吧，我等得花儿都谢了'];
+export const INTERACTION_ITEMS = ['tomato', 'bucket'];
 
 function genToken() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
     return 'p-' + globalThis.crypto.randomUUID();
   }
   return 'p-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+}
+
+function genPublicId() {
+  return genToken().replace(/^p-/, 'u-');
 }
 
 export class Game {
@@ -34,11 +40,28 @@ export class Game {
     this.lastActions = {};    // 本圈内每位玩家的最后动作（用于桌面展示）
     this.result = null;
     this.log = [];
+    this.chat = [];
+    this.messageSeq = 0;
+    this.interactionSeq = 0;
+    this.lastInteraction = null;
   }
 
   pushLog(msg) {
     this.log.push(msg);
     if (this.log.length > 60) this.log.splice(0, this.log.length - 60);
+  }
+
+  normalize() {
+    this.chat ||= [];
+    this.messageSeq ||= 0;
+    this.interactionSeq ||= 0;
+    this.lastInteraction ||= null;
+    for (const player of this.players) {
+      player.publicId ||= genPublicId();
+      player.isBot = !!player.isBot;
+      player.voice = false;
+    }
+    return this;
   }
 
   /* ---------------- 房间管理 ---------------- */
@@ -49,13 +72,14 @@ export class Game {
       const p = this.players.find(x => x.id === token);
       if (p) {
         p.connected = true;
+        p.voice = false;
         this.pushLog(`${p.name} 重新连接`);
         return { player: p };
       }
     }
     if (this.phase !== 'lobby') return { error: '对局进行中，暂时无法加入' };
     if (this.players.length >= MAX_PLAYERS) return { error: `房间已满（最多 ${MAX_PLAYERS} 人）` };
-    const p = { id: genToken(), name, hand: [], ready: false, connected: true, score: 0, outRank: null };
+    const p = { id: genToken(), publicId: genPublicId(), name, hand: [], ready: false, connected: true, score: 0, outRank: null, isBot: false, voice: false };
     this.players.push(p);
     this.pushLog(`${name} 加入了房间`);
     return { player: p };
@@ -69,6 +93,7 @@ export class Game {
       this.pushLog(`${p.name} 离开了房间`);
     } else {
       p.connected = false;
+      p.voice = false;
       this.pushLog(`${p.name} 掉线，等待重连…`);
     }
   }
@@ -83,6 +108,12 @@ export class Game {
       case 'reveal': return this.reveal(id);
       case 'next': return this.next(id);
       case 'toLobby': return this.toLobby(id);
+      case 'addBot': return this.addBot(id);
+      case 'removeBot': return this.removeBot(id, msg.id);
+      case 'chat': return this.sendChat(id, msg.text, false);
+      case 'quick': return this.sendChat(id, msg.text, true);
+      case 'voiceStatus': return this.setVoiceStatus(id, !!msg.enabled);
+      case 'interact': return this.interact(id, msg.to, msg.item);
       default: return '未知操作';
     }
   }
@@ -92,6 +123,72 @@ export class Game {
     const p = this.players.find(x => x.id === id);
     p.ready = ready;
     if (ready) this.pushLog(`${p.name} 已准备`);
+    return null;
+  }
+
+  addBot(id) {
+    if (id !== this.players[0].id) return '只有房主可以添加人机';
+    if (this.phase !== 'lobby') return '只能在大厅添加人机';
+    if (this.players.length >= MAX_PLAYERS) return `房间已满（最多 ${MAX_PLAYERS} 人）`;
+    const used = new Set(this.players.filter(p => p.isBot).map(p => p.name));
+    let index = 1;
+    while (used.has(`电脑${index}`)) index++;
+    const bot = {
+      id: `bot-${genToken()}`, publicId: genPublicId(), name: `电脑${index}`, hand: [], ready: true,
+      connected: true, score: 0, outRank: null, isBot: true, voice: false,
+    };
+    this.players.push(bot);
+    this.pushLog(`${bot.name} 加入了房间`);
+    return null;
+  }
+
+  removeBot(id, botId) {
+    if (id !== this.players[0].id) return '只有房主可以移除人机';
+    if (this.phase !== 'lobby') return '只能在大厅移除人机';
+    let index = botId ? this.players.findIndex(p => (p.publicId === botId || p.id === botId) && p.isBot) : -1;
+    if (index < 0) {
+      for (let i = this.players.length - 1; i >= 0; i--) {
+        if (this.players[i].isBot) { index = i; break; }
+      }
+    }
+    if (index < 0) return '房间里没有人机';
+    const [bot] = this.players.splice(index, 1);
+    this.pushLog(`${bot.name} 离开了房间`);
+    return null;
+  }
+
+  sendChat(id, value, quick) {
+    const p = this.players.find(player => player.id === id);
+    if (!p || p.isBot) return '无法发送消息';
+    const text = String(value || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    if (!text) return '消息不能为空';
+    if (quick && !QUICK_PHRASES.includes(text)) return '快捷语音无效';
+    this.chat.push({ id: ++this.messageSeq, playerId: p.publicId, name: p.name, text, quick, at: Date.now() });
+    if (this.chat.length > 40) this.chat.splice(0, this.chat.length - 40);
+    return null;
+  }
+
+  setVoiceStatus(id, enabled) {
+    const p = this.players.find(player => player.id === id);
+    if (!p || p.isBot) return '人机不能加入语音';
+    p.voice = enabled;
+    return null;
+  }
+
+  interact(id, targetId, item) {
+    const from = this.players.find(player => player.id === id);
+    const to = this.players.find(player => player.publicId === targetId);
+    if (!from || !to) return '找不到互动对象';
+    if (from === to) return '不能对自己使用道具';
+    if (!INTERACTION_ITEMS.includes(item)) return '互动道具无效';
+    const now = Date.now();
+    if (from.lastInteractionAt && now - from.lastInteractionAt < 700) return '操作太快了，请稍后再试';
+    from.lastInteractionAt = now;
+    this.lastInteraction = {
+      id: ++this.interactionSeq, fromId: from.publicId, fromName: from.name,
+      toId: to.publicId, toName: to.name, item, at: now,
+    };
+    this.pushLog(`${from.name}${item === 'tomato' ? '向' : '给'}${to.name}${item === 'tomato' ? '扔了一个番茄' : '泼了一桶水'}`);
     return null;
   }
 
@@ -193,6 +290,15 @@ export class Game {
     return null;
   }
 
+  actBot() {
+    if (this.phase !== 'playing') return false;
+    const p = this.players[this.turn];
+    if (!p || !p.isBot) return false;
+    const hint = findHint(p.hand, this.pending ? this.pending.combo : null);
+    const error = hint ? this.play(p.id, hint.map(card => card.id)) : this.pass(p.id);
+    return error ? false : true;
+  }
+
   reveal(id) {
     if (this.phase !== 'playing') return '现在不能明牌';
     const seat = this.players.findIndex(p => p.id === id);
@@ -249,17 +355,20 @@ export class Game {
     // 名次基础分：5 人局为 头科+10 / 二科+5 / 三科0 / 四科-5 / 大落-10，其他人数等差展开
     const posPts = pos => (n - 1 - 2 * (pos - 1)) * 5;
     const sumA = teamA.reduce((s, seat) => s + posPts(this.players[seat].outRank), 0);
+    const zeroRound = this.players[this.dealer].outRank !== n;
     const mult = this.solo ? 2 : 1;
     const rows = this.players.map((p, i) => {
       const inA = teamA.includes(i);
-      const delta = (inA ? sumA : -sumA) * mult;
+      const delta = zeroRound ? 0 : (inA ? sumA : -sumA) * mult;
       p.score += delta;
       return { name: p.name, pos: p.outRank, posName: posName(p.outRank, n), team: inA ? '庄家' : '闲家', delta, score: p.score };
     }).sort((a, b) => a.pos - b.pos);
     this.blackFivePublic = true; // 结算时公开黑五身份
-    this.result = { winTeam: this.winTeam, solo: this.solo, rows };
+    this.result = { winTeam: this.winTeam, solo: this.solo, zeroRound, rows };
     this.phase = 'roundEnd';
-    this.pushLog(`本局结束：${this.winTeam === 'A' ? '庄家阵营' : '闲家阵营'}获胜${this.solo ? '（独庄，分数翻倍）' : ''}`);
+    this.pushLog(zeroRound
+      ? '本局结束：庄家不是大落，全员记 0 分'
+      : `本局结束：${this.winTeam === 'A' ? '庄家阵营' : '闲家阵营'}获胜${this.solo ? '（独庄，分数翻倍）' : ''}`);
   }
 
   next(id) {
@@ -278,7 +387,7 @@ export class Game {
     this.result = null;
     this.pending = null;
     this.lastActions = {};
-    this.players.forEach(p => { p.ready = false; p.score = 0; p.hand = []; p.outRank = null; });
+    this.players.forEach(p => { p.ready = !!p.isBot; p.score = 0; p.hand = []; p.outRank = null; p.voice = false; });
     this.pushLog('已返回大厅，积分清零');
     return null;
   }
@@ -288,19 +397,20 @@ export class Game {
   // 按玩家生成"战争迷雾"视图：只暴露该玩家应看到的信息
   viewFor(id) {
     const me = this.players.find(p => p.id === id);
-    if (!me) return { phase: 'gone', myId: id, players: [], myHand: [], log: [] };
+    if (!me) return { phase: 'gone', myId: null, players: [], myHand: [], log: [] };
     const inGame = this.phase !== 'lobby';
     const mySeat = this.players.indexOf(me);
     return {
       phase: this.phase,
       round: this.round,
       n: this.players.length,
-      myId: id,
+      myId: me.publicId,
       isHost: id === this.players[0].id,
       mySeat,
       players: this.players.map((p, i) => ({
-        id: p.id, name: p.name, count: p.hand.length, ready: p.ready,
+        id: p.publicId, name: p.name, count: p.hand.length, ready: p.ready,
         connected: p.connected, outRank: p.outRank, score: p.score,
+        isBot: !!p.isBot, voice: !!p.voice,
         isMe: p.id === id, isRoomOwner: i === 0,
         isDealer: inGame && i === this.dealer,
         isBlackFive: inGame && this.blackFivePublic && i === this.blackFiveSeat,
@@ -323,6 +433,8 @@ export class Game {
         : null,
       winTeam: this.winTeam,
       result: this.result,
+      chat: this.chat.slice(-30),
+      lastInteraction: this.lastInteraction,
       log: this.log.slice(-9),
       canStart: this.phase === 'lobby'
         && this.players.length >= MIN_PLAYERS

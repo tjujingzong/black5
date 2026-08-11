@@ -1,7 +1,8 @@
 // 入口：首页交互 + Cloudflare 房间 WebSocket 装配。
 import { createRoom, RoomNet } from './net.js';
-import { init as initUI, render, bindSend, toast, setRoomInfo } from './ui.js';
+import { init as initUI, render, bindSend, toast, setRoomInfo, showInteraction } from './ui.js';
 import { gameAudio } from './audio.js';
+import { VoiceChat } from './voice.js';
 
 const $ = selector => document.querySelector(selector);
 initUI();
@@ -14,6 +15,22 @@ $('#inp-name').value = sessionStorage.getItem('jh5-name') || '';
 let roomNet = null;
 let currentRoom = null;
 let retryCount = 0;
+const voiceChat = new VoiceChat({
+  send: message => roomNet ? roomNet.send(message) : false,
+  onState({ enabled, busy }) {
+    const button = $('#btn-voice');
+    button.disabled = busy;
+    button.classList.toggle('active', enabled);
+    button.setAttribute('aria-pressed', String(enabled));
+    button.textContent = enabled ? '🎙' : '🎤';
+    const label = busy ? '正在开启麦克风' : enabled ? '关闭语音' : '开启语音';
+    button.setAttribute('aria-label', label);
+    button.title = label;
+  },
+  onError: message => toast(message),
+});
+
+$('#btn-voice').addEventListener('click', () => voiceChat.toggle());
 
 function setSender(fn) {
   bindSend(fn);
@@ -40,7 +57,10 @@ function resetHomeButtons() {
 }
 
 function connectRoom(code, name, token) {
-  if (roomNet) roomNet.destroy();
+  if (roomNet) {
+    voiceChat.onDisconnected();
+    roomNet.destroy();
+  }
   currentRoom = { code, name, token };
 
   const net = new RoomNet({
@@ -53,6 +73,7 @@ function connectRoom(code, name, token) {
         if (!net.send(message)) toast('连接尚未恢复，请稍后再试');
       });
       setRoomInfo(code);
+      voiceChat.onConnected();
       resetHomeButtons();
       showRoom();
     },
@@ -60,7 +81,12 @@ function connectRoom(code, name, token) {
       if (roomNet === net) {
         gameAudio.observe(view);
         render(view);
+        showInteraction(view.lastInteraction);
+        voiceChat.update(view);
       }
+    },
+    onVoiceSignal(message) {
+      if (roomNet === net) voiceChat.handleSignal(message);
     },
     onError(message) {
       if (roomNet === net) {
@@ -70,6 +96,7 @@ function connectRoom(code, name, token) {
     },
     onClose({ rejected }) {
       if (roomNet !== net) return;
+      voiceChat.onDisconnected();
       if (rejected) {
         resetHomeButtons();
         return;

@@ -26,10 +26,10 @@
     <ul>
       <li>一副牌去掉大小王共 52 张；庄家及其下家各多发 1 张，其余玩家依次少 1 张（人数不同自动调整，默认 5 人：11/11/10/10/10）。</li>
       <li>持有<b>黑桃5</b>的玩家是庄家的秘密队友（"黑五"）；庄家自己拿到黑桃5则为<b>独庄</b>，独自对抗所有闲家。</li>
-      <li>逆时针出牌，庄家首出。牌型：单张、对子、3 张以上顺子、连对、三张（炸弹）、四张（轰牌）。</li>
+      <li>逆时针出牌，庄家首出。牌型：单张、对子、3 张以上顺子、连对、三张（炸弹）、四张（轰牌）；顺子和连对只到 A，最大三张顺子为 Q-K-A，K-A-2 不成立。</li>
       <li>牌力从小到大为 4、6、7、8、9、10、J、Q、K、A、2、3、5；同牌型的 5 可以压 5。</li>
       <li>压牌需同牌型同长度且牌力更大，或直接使用炸弹；轰牌 &gt; 炸弹 &gt; 普通牌型。黑五可选择适当时机"明牌"亮出身份。</li>
-      <li>头科（第一个出完手牌者）所在阵营获胜；按 头科/二科/…/大落 计分，独庄分数翻倍。</li>
+      <li>头科（第一个出完手牌者）所在阵营获胜；庄家不是大落时本局全员记 0 分，庄家大落时再按名次结算，独庄分数翻倍。</li>
     </ul>
   </details>
 </section>
@@ -41,6 +41,7 @@
       <button id="btn-copy" class="mini">复制邀请链接</button>
     </div>
     <div class="rc room-tools">
+      <button id="btn-voice" class="mini voice-toggle" aria-label="开启语音" title="开启语音" aria-pressed="false">🎤</button>
       <button id="btn-audio" class="mini audio-toggle" aria-label="关闭音乐和音效" title="关闭音乐和音效">♫</button>
       <button id="btn-leave" class="mini">离开房间</button>
     </div>

@@ -33,6 +33,8 @@ button.mini{padding:3px 10px;font-size:12px;border-radius:8px;}
 .room-tools{display:flex;align-items:center;gap:7px;}
 .audio-toggle{width:34px;height:28px;padding:0;font-size:17px;line-height:1;}
 .audio-toggle.active{color:var(--gold);border-color:var(--gold);}
+.voice-toggle{width:34px;height:28px;padding:0;font-size:16px;line-height:1;}
+.voice-toggle.active{color:#79f2b2;border-color:#79f2b2;background:#0f7854;}
 input{
   font:inherit;padding:9px 12px;border-radius:10px;border:1px solid var(--line);
   background:rgba(0,0,0,.35);color:#eef7f2;outline:none;width:100%;
@@ -69,6 +71,11 @@ input:focus{border-color:var(--gold);}
   border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:9px 14px;}
 .plist li.off{opacity:.5;}
 .pstate{font-size:13px;opacity:.85;}
+.pname{display:flex;align-items:center;gap:8px;}
+.lobby-avatar,.avatar-static{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;
+  border-radius:50%;background:#d7eee4;color:#103c2f;font-weight:800;flex:0 0 auto;}
+.actions-col{display:flex;flex-direction:column;align-items:center;gap:10px;}
+.bot-actions{display:flex;gap:8px;}
 .actions{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
 
 /* ---------- 对局 ---------- */
@@ -85,6 +92,10 @@ input:focus{border-color:var(--gold);}
 .chip.turn{border-color:var(--gold);box-shadow:0 0 12px rgba(255,215,94,.45);}
 .chip.off{opacity:.55;}
 .chip.out{background:rgba(255,255,255,.10);}
+.avatar{position:absolute;left:9px;top:10px;width:35px;height:35px;border-radius:50%;padding:0;
+  background:#d7eee4;color:#103c2f;border:2px solid rgba(255,255,255,.65);font-weight:800;z-index:3;}
+.avatar:hover:not(:disabled){background:#fff;transform:scale(1.06);}
+.chip-main{padding-left:34px;}
 .seat-top{left:50%;top:12%;}
 .seat-top-left{left:28%;top:14%;}
 .seat-top-right{left:72%;top:14%;}
@@ -99,6 +110,8 @@ input:focus{border-color:var(--gold);}
 .tag.dealer{background:#c9962c;color:#231a05;}
 .tag.b5{background:#111;border:1px solid #888;color:#fff;}
 .tag.solo{background:#7c3aed;color:#fff;}
+.tag.bot{background:#176b87;color:#fff;}
+.tag.voice{background:#0f7854;color:#fff;}
 .meta{display:block;font-size:12px;opacity:.85;margin-top:3px;}
 .meta.finish{color:var(--gold);font-weight:700;}
 .off-tag{color:#ff9d5c;}
@@ -125,6 +138,8 @@ input:focus{border-color:var(--gold);}
 .table-turn{margin-top:13px;font-size:12px;opacity:.66;}
 .table-turn.mine{color:var(--gold);opacity:1;font-weight:700;}
 .self-zone{padding-top:2px;}
+.self-profile{display:flex;align-items:center;justify-content:center;gap:7px;font-size:12px;min-height:28px;}
+.voice-mark{font-style:normal;color:#79f2b2;font-size:11px;}
 .myact{text-align:center;min-height:22px;font-size:12px;opacity:.85;margin-bottom:2px;}
 
 .mcard{display:inline-block;background:#fff;color:#111;border-radius:4px;
@@ -149,6 +164,34 @@ input:focus{border-color:var(--gold);}
 
 .controls{display:flex;gap:10px;justify-content:center;padding:12px 0 4px;flex-wrap:wrap;}
 .controls [data-act="play"]{order:10;margin-left:auto;}
+
+/* ---------- 聊天与互动 ---------- */
+.chat-panel{margin-top:14px;border-top:1px solid rgba(255,255,255,.14);padding-top:12px;}
+.chat-head{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+.chat-head>b{font-size:13px;white-space:nowrap;}
+.quick-phrases{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;}
+.quick-phrases button{font-size:12px;padding:5px 9px;white-space:nowrap;}
+.chat-messages{height:112px;overflow-y:auto;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.1);
+  padding:8px 10px;display:flex;flex-direction:column;gap:5px;}
+.chat-message{display:flex;gap:8px;font-size:12px;line-height:1.4;}
+.chat-message b{color:var(--gold);white-space:nowrap;}
+.chat-message.mine b{color:#79f2b2;}
+.quick-message span{font-weight:650;}
+.chat-empty{font-size:12px;opacity:.55;margin:auto;}
+.chat-compose{display:flex;gap:8px;margin-top:8px;}
+.chat-compose input{min-width:0;}
+.chat-compose button{flex:0 0 auto;}
+.prop-menu{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:30;
+  display:flex;align-items:center;gap:8px;background:#0d4130;border:1px solid var(--gold);
+  box-shadow:0 8px 28px rgba(0,0,0,.45);padding:9px 10px;max-width:calc(100vw - 20px);}
+.prop-menu span{font-size:12px;white-space:nowrap;}
+.prop-menu button{white-space:nowrap;}
+.prop-menu .icon-close{width:30px;height:30px;padding:0;font-size:20px;line-height:1;}
+.prop-flight{position:fixed;z-index:80;font-size:34px;pointer-events:none;filter:drop-shadow(0 4px 4px rgba(0,0,0,.45));}
+.prop-impact{position:fixed;z-index:81;transform:translate(-50%,-50%);font-size:20px;font-weight:900;
+  color:#fff;text-shadow:0 2px 5px #000;pointer-events:none;animation:prop-impact .65s ease-out forwards;}
+.prop-impact.tomato{color:#ff6b5f;}.prop-impact.bucket{color:#70d8ff;}
+@keyframes prop-impact{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}35%{opacity:1;transform:translate(-50%,-50%) scale(1.5)}100%{opacity:0;transform:translate(-50%,-70%) scale(1)}}
 
 /* ---------- 日志 ---------- */
 .logbox{margin-top:16px;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.1);
@@ -187,6 +230,8 @@ td.minus{color:#ff8d8d;font-weight:700;}
   #room-body,.game,.table-wrap,.self-zone{width:100%;min-width:0;max-width:100%;}
   .table-felt{width:100%;max-width:calc(100vw - 16px);height:470px;border-width:6px;border-radius:28px;}
   .chip{width:104px;height:72px;padding:6px 5px;}
+  .avatar{left:5px;top:7px;width:28px;height:28px;font-size:11px;}
+  .chip-main{padding-left:25px;}
   .cname{font-size:12px;}
   .cscore,.cact{font-size:10px;}
   .seat-top{top:10%;}
@@ -208,4 +253,8 @@ td.minus{color:#ff8d8d;font-weight:700;}
   .secret{white-space:normal;overflow-wrap:anywhere;line-height:1.5;}
   .hand{justify-content:flex-start;}
   .controls .accent{flex:0 0 min(220px,100%);}
+  .chat-head{align-items:flex-start;flex-direction:column;gap:7px;}
+  .quick-phrases{width:100%;}
+  .prop-menu{width:calc(100vw - 16px);justify-content:center;bottom:10px;}
+  .prop-menu span{display:none;}
 }

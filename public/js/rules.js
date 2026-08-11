@@ -3,7 +3,7 @@
 // 牌型：single 单张 | pair 对子 | triple 三张(炸弹) | quad 四张(轰牌)
 //       straight 顺子(3张以上) | pairs 连对(2连对以上)
 
-import { RANK_ORDER, rankStrength } from './cards.js';
+import { SEQUENCE_ORDER, rankStrength } from './cards.js';
 
 function sortRanks(ranks) {
   return ranks.sort((a, b) => rankStrength(a) - rankStrength(b));
@@ -14,6 +14,7 @@ function rankCanBeat(a, b) {
 }
 
 function consecutive(ranks) {
+  if (ranks.some(rank => !SEQUENCE_ORDER.includes(rank))) return false;
   for (let i = 1; i < ranks.length; i++) {
     if (rankStrength(ranks[i]) !== rankStrength(ranks[i - 1]) + 1) return false;
   }
@@ -130,8 +131,8 @@ export function findHint(hand, combo) {
 }
 
 function findSequence(byRank, rankCount, cardsPerRank, combo) {
-  for (let start = 0; start + rankCount <= RANK_ORDER.length; start++) {
-    const ranks = RANK_ORDER.slice(start, start + rankCount);
+  for (let start = 0; start + rankCount <= SEQUENCE_ORDER.length; start++) {
+    const ranks = SEQUENCE_ORDER.slice(start, start + rankCount);
     if (!ranks.every(rank => (byRank.get(rank) || []).length >= cardsPerRank)) continue;
     const candidate = { kind: combo.kind, rank: ranks[ranks.length - 1], len: combo.len };
     if (!canBeat(candidate, combo)) continue;

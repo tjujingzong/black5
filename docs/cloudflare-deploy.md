@@ -139,3 +139,11 @@ npx wrangler logout
 - <https://developers.cloudflare.com/workers/platform/pricing/>
 - <https://developers.cloudflare.com/durable-objects/platform/pricing/>
 - <https://developers.cloudflare.com/durable-objects/best-practices/websockets/>
+
+## 九、语音功能说明
+
+- 房间语音必须在 HTTPS 或 `localhost` 下使用；`workers.dev` 默认提供 HTTPS。
+- 第一次点击房间右上角麦克风按钮时，浏览器会请求麦克风权限。
+- Cloudflare Durable Object 只负责转发 WebRTC 信令，实际音频在参与者浏览器之间传输。
+- STUN 使用 `stun.cloudflare.com:3478`，不依赖 PeerJS。极少数严格企业网络或对称 NAT
+  环境可能还需要 TURN；本项目默认不配置付费 TURN 服务。

@@ -4,6 +4,7 @@ const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 5;
 const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_MESSAGE_LENGTH = 16 * 1024;
+const BOT_DELAY_MS = 650;
 
 function json(data, status = 200) {
   return Response.json(data, {
@@ -75,13 +76,14 @@ function restoreGame(saved) {
   if (!saved) return null;
   const game = new Game();
   Object.assign(game, saved);
-  return game;
+  return game.normalize();
 }
 
 export class Room {
   constructor(state) {
     this.state = state;
     this.game = null;
+    this.botRunning = false;
     state.blockConcurrencyWhile(async () => {
       this.game = restoreGame(await state.storage.get('game'));
     });
@@ -137,6 +139,11 @@ export class Room {
       this.reject(ws, '房间已失效', 4004);
       return;
     }
+    if (data && data.t === 'voiceSignal') {
+      this.forwardVoiceSignal(attachment.playerId, data);
+      return;
+    }
+
     const error = this.game.handleMsg(attachment.playerId, data);
     if (error) {
       this.send(ws, { t: 'err', msg: error });
@@ -144,6 +151,7 @@ export class Room {
     }
     await this.persist();
     this.broadcast();
+    await this.runBots();
   }
 
   async joinSocket(ws, data) {
@@ -173,6 +181,7 @@ export class Room {
     this.send(ws, { t: 'welcome', id: playerId, token: playerId });
     await this.persist();
     this.broadcast();
+    await this.runBots();
   }
 
   async webSocketClose(ws) {
@@ -202,6 +211,37 @@ export class Room {
       ws.send(JSON.stringify(data));
     } catch (e) {
       // A close/error event will perform disconnect cleanup.
+    }
+  }
+
+  forwardVoiceSignal(fromId, data) {
+    const from = this.game.players.find(player => player.id === fromId);
+    const to = this.game.players.find(player => player.publicId === data.to);
+    const kinds = ['offer', 'answer', 'ice'];
+    if (!from || !to || !from.voice || !to.voice || !kinds.includes(data.kind) || !data.data) return;
+    for (const ws of this.state.getWebSockets()) {
+      const { playerId } = ws.deserializeAttachment() || {};
+      if (playerId === to.id) {
+        this.send(ws, { t: 'voiceSignal', from: from.publicId, kind: data.kind, data: data.data });
+      }
+    }
+  }
+
+  async runBots() {
+    if (this.botRunning || !this.game) return;
+    this.botRunning = true;
+    try {
+      while (this.game.phase === 'playing') {
+        const player = this.game.players[this.game.turn];
+        if (!player || !player.isBot) break;
+        await new Promise(resolve => setTimeout(resolve, BOT_DELAY_MS));
+        if (!this.game || this.game.phase !== 'playing' || !this.game.players[this.game.turn]?.isBot) break;
+        if (!this.game.actBot()) break;
+        await this.persist();
+        this.broadcast();
+      }
+    } finally {
+      this.botRunning = false;
     }
   }
 

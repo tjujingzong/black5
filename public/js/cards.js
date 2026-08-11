@@ -5,6 +5,8 @@
 export const SUITS = ['♠', '♥', '♣', '♦'];
 export const BLACK5_ID = '0-5'; // 黑桃5 —— 决定"黑五"身份的关键牌
 export const RANK_ORDER = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 3, 5];
+// 顺子和连对只使用 4 到 A；2、3、5 只能参与单张、对子和炸弹。
+export const SEQUENCE_ORDER = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 
 const RANK_STRENGTH = new Map(RANK_ORDER.map((rank, index) => [rank, index]));
 

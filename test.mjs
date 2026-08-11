@@ -2,6 +2,7 @@
 import { Game } from './public/js/engine.js';
 import { classify, canBeat, findHint } from './public/js/rules.js';
 import { BLACK5_ID, sortHand } from './public/js/cards.js';
+import { comboSpeech } from './public/js/speech.js';
 
 let failed = 0;
 function ok(cond, msg) {
@@ -16,10 +17,13 @@ ok(classify([C(9, 0), C(9, 1)]).kind === 'pair', '对子');
 ok(classify([C(9, 0), C(9, 1), C(9, 2)]).kind === 'triple', '三张=炸弹');
 ok(classify([C(9, 0), C(9, 1), C(9, 2), C(9, 3)]).kind === 'quad', '四张=轰牌');
 ok(classify([C(4), C(6), C(7)]).kind === 'straight', '4-6-7 顺子合法');
-ok(classify([C(12), C(13), C(14), C(15)]).kind === 'straight', 'Q-K-A-2 顺子合法');
-ok(classify([C(15), C(3), C(5)]).kind === 'straight', '2-3-5 顺子合法');
+ok(classify([C(12), C(13), C(14)]).kind === 'straight', 'Q-K-A 是最大顺子');
+ok(classify([C(13), C(14), C(15)]) === null, 'K-A-2 不是顺子');
+ok(classify([C(12), C(13), C(14), C(15)]) === null, '顺子不能包含 2');
+ok(classify([C(15), C(3), C(5)]) === null, '2-3-5 不是顺子');
 ok(classify([C(3), C(5), C(4)]) === null, '牌力首尾不能循环成顺子');
-ok(classify([C(14, 0), C(14, 1), C(15, 2), C(15, 3)]).kind === 'pairs', 'A-2 连对合法');
+ok(classify([C(13, 0), C(13, 1), C(14, 2), C(14, 3)]).kind === 'pairs', 'K-A 连对合法');
+ok(classify([C(14, 0), C(14, 1), C(15, 2), C(15, 3)]) === null, 'A-2 不是连对');
 ok(classify([C(3), C(5), C(7)]) === null, '不连续不是顺子');
 
 console.log('== 比大小 ==');
@@ -40,6 +44,81 @@ ok(ordered.map(c => c.rank).join(',') === '4,6,14,15,3,5', '手牌按 4、6…A�
 
 const fiveHint = findHint([C(5, 1)], { kind: 'single', rank: 5, len: 1 });
 ok(fiveHint && fiveHint[0].rank === 5, '提示能找到另一张 5 压 5');
+
+console.log('== 出牌播报 ==');
+for (const rank of [15, 3, 4, 5]) {
+  ok(comboSpeech({ kind: 'single', rank }) === ({ 15: '2', 3: '3', 4: '4', 5: '5' })[rank], `单张 ${rank === 15 ? 2 : rank} 点数播报`);
+}
+ok(comboSpeech({ kind: 'pair', rank: 14 }) === '对A', '对子会播报具体点数');
+ok(comboSpeech({ kind: 'straight', rank: 14 }) === '顺子', '顺子牌型播报');
+ok(comboSpeech({ kind: 'pairs', rank: 13 }) === '连对', '连对牌型播报');
+ok(comboSpeech({ kind: 'triple', rank: 9 }) === '三个9，炸弹', '三张炸弹播报');
+ok(comboSpeech({ kind: 'quad', rank: 10 }) === '四个10，轰牌', '四张轰牌播报');
+
+console.log('== 计分与人机 ==');
+const zeroGame = new Game();
+zeroGame.players = [
+  { id: 'd', name: '庄家', hand: [], outRank: 2, score: 10 },
+  { id: 'b', name: '黑五', hand: [], outRank: 3, score: 10 },
+  { id: 'x', name: '闲家', hand: [], outRank: 1, score: 10 },
+];
+zeroGame.dealer = 0;
+zeroGame.blackFiveSeat = 1;
+zeroGame.solo = false;
+zeroGame.winTeam = 'B';
+zeroGame.rankCount = 3;
+zeroGame.phase = 'playing';
+zeroGame.finishRound();
+ok(zeroGame.result.zeroRound && zeroGame.result.rows.every(row => row.delta === 0), '庄家不是大落时全员记 0 分');
+ok(zeroGame.players.every(player => player.score === 10), '0 分局不改变累计积分');
+
+const scoredGame = new Game();
+scoredGame.players = [
+  { id: 'd', name: '庄家', hand: [], outRank: 4, score: 0 },
+  { id: 'b', name: '黑五', hand: [], outRank: 2, score: 0 },
+  { id: 'x', name: '闲家甲', hand: [], outRank: 1, score: 0 },
+  { id: 'y', name: '闲家乙', hand: [], outRank: 3, score: 0 },
+];
+scoredGame.dealer = 0;
+scoredGame.blackFiveSeat = 1;
+scoredGame.solo = false;
+scoredGame.winTeam = 'B';
+scoredGame.rankCount = 4;
+scoredGame.phase = 'playing';
+scoredGame.finishRound();
+ok(!scoredGame.result.zeroRound && scoredGame.result.rows.some(row => row.delta !== 0), '庄家大落时按名次正常计分');
+
+const botGame = new Game();
+const hostId = botGame.join('测试员').player.id;
+ok(botGame.handleMsg(hostId, { t: 'addBot' }) === null, '房主可添加第一名人机');
+ok(botGame.handleMsg(hostId, { t: 'addBot' }) === null, '房主可添加第二名人机');
+ok(botGame.players.filter(player => player.isBot).length === 2, '人机座位已建立');
+const firstBotId = botGame.players.find(player => player.isBot).publicId;
+ok(botGame.handleMsg(hostId, { t: 'chat', text: ' 本地联机测试 ' }) === null
+  && botGame.chat.at(-1).text === '本地联机测试', '文字聊天会清理首尾空白并保存');
+ok(botGame.handleMsg(hostId, { t: 'quick', text: '一个小单张' }) === null
+  && botGame.chat.at(-1).quick, '快捷语音按白名单发送');
+ok(botGame.handleMsg(hostId, { t: 'quick', text: '任意播报' }) === '快捷语音无效', '拒绝伪造的快捷语音');
+ok(botGame.handleMsg(hostId, { t: 'voiceStatus', enabled: true }) === null
+  && botGame.players[0].voice, '真人语音状态会同步');
+ok(botGame.handleMsg(hostId, { t: 'interact', to: firstBotId, item: 'tomato' }) === null
+  && botGame.lastInteraction.item === 'tomato', '番茄互动会生成同步事件');
+ok(botGame.handleMsg(hostId, { t: 'interact', to: botGame.players[0].publicId, item: 'bucket' }) === '不能对自己使用道具', '不能对自己使用互动道具');
+const hostView = botGame.viewFor(hostId);
+ok(hostView.myId !== hostId && hostView.players.every(player => player.id !== hostId), '公开玩家 ID 不泄露断线重连令牌');
+ok(botGame.handleMsg(hostId, { t: 'start' }) === null, '一名真人加两名人机可开始游戏');
+let botSteps = 0;
+while (botGame.phase === 'playing' && botSteps < 5000) {
+  const player = botGame.players[botGame.turn];
+  if (player.isBot) botGame.actBot();
+  else {
+    const hint = findHint(player.hand, botGame.pending ? botGame.pending.combo : null);
+    if (hint) botGame.play(player.id, hint.map(card => card.id));
+    else botGame.pass(player.id);
+  }
+  botSteps++;
+}
+ok(botGame.phase === 'roundEnd', `人机对局正常结束（${botSteps} 步）`);
 
 console.log('== 整局模拟（随机 20 局）==');
 for (let t = 0; t < 20; t++) {
