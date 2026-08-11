@@ -1,9 +1,11 @@
 // 入口：首页交互 + Cloudflare 房间 WebSocket 装配。
 import { createRoom, RoomNet } from './net.js';
 import { init as initUI, render, bindSend, toast, setRoomInfo } from './ui.js';
+import { gameAudio } from './audio.js';
 
 const $ = selector => document.querySelector(selector);
 initUI();
+gameAudio.init();
 
 const params = new URLSearchParams(location.search);
 if (params.get('room')) $('#inp-code').value = params.get('room').toUpperCase().slice(0, 5);
@@ -55,10 +57,16 @@ function connectRoom(code, name, token) {
       showRoom();
     },
     onState(view) {
-      if (roomNet === net) render(view);
+      if (roomNet === net) {
+        gameAudio.observe(view);
+        render(view);
+      }
     },
     onError(message) {
-      if (roomNet === net) toast(message);
+      if (roomNet === net) {
+        gameAudio.play('error');
+        toast(message);
+      }
     },
     onClose({ rejected }) {
       if (roomNet !== net) return;

@@ -1,14 +1,21 @@
 // 牌的基础定义：一副标准牌去掉大小王，共 52 张
-// 点数编码：3~10 原值，J=11 Q=12 K=13 A=14 2=15（2 最大，且不参与顺子/连对）
+// 点数编码保持 3~10 原值，J=11 Q=12 K=13 A=14 2=15；牌力使用下方自定义顺序。
 // 花色编码：0=♠ 1=♥ 2=♣ 3=♦
 
 export const SUITS = ['♠', '♥', '♣', '♦'];
 export const BLACK5_ID = '0-5'; // 黑桃5 —— 决定"黑五"身份的关键牌
+export const RANK_ORDER = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 3, 5];
+
+const RANK_STRENGTH = new Map(RANK_ORDER.map((rank, index) => [rank, index]));
 
 const FACE = { 11: 'J', 12: 'Q', 13: 'K', 14: 'A', 15: '2' };
 
 export function rankChar(r) {
   return r <= 10 ? String(r) : FACE[r];
+}
+
+export function rankStrength(rank) {
+  return RANK_STRENGTH.get(rank) ?? -1;
 }
 
 export function makeDeck() {
@@ -30,7 +37,7 @@ export function isRed(c) {
 }
 
 export function sortHand(hand) {
-  hand.sort((a, b) => a.rank - b.rank || a.suit - b.suit);
+  hand.sort((a, b) => rankStrength(a.rank) - rankStrength(b.rank) || a.suit - b.suit);
 }
 
 // Fisher–Yates 洗牌

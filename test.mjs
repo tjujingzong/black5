@@ -1,7 +1,7 @@
 // Node 冒烟测试：牌型规则 + 5 人完整对局模拟（bot 自动打完）
 import { Game } from './public/js/engine.js';
 import { classify, canBeat, findHint } from './public/js/rules.js';
-import { BLACK5_ID } from './public/js/cards.js';
+import { BLACK5_ID, sortHand } from './public/js/cards.js';
 
 let failed = 0;
 function ok(cond, msg) {
@@ -15,9 +15,11 @@ ok(classify([C(7)]).kind === 'single', '单张');
 ok(classify([C(9, 0), C(9, 1)]).kind === 'pair', '对子');
 ok(classify([C(9, 0), C(9, 1), C(9, 2)]).kind === 'triple', '三张=炸弹');
 ok(classify([C(9, 0), C(9, 1), C(9, 2), C(9, 3)]).kind === 'quad', '四张=轰牌');
-ok(classify([C(3), C(4), C(5)]).kind === 'straight', '3张顺子合法');
-ok(classify([C(12), C(13), C(14), C(15)]) === null, '顺子不能含2');
-ok(classify([C(13, 0), C(13, 1), C(14, 2), C(14, 3)]).kind === 'pairs', '连对');
+ok(classify([C(4), C(6), C(7)]).kind === 'straight', '4-6-7 顺子合法');
+ok(classify([C(12), C(13), C(14), C(15)]).kind === 'straight', 'Q-K-A-2 顺子合法');
+ok(classify([C(15), C(3), C(5)]).kind === 'straight', '2-3-5 顺子合法');
+ok(classify([C(3), C(5), C(4)]) === null, '牌力首尾不能循环成顺子');
+ok(classify([C(14, 0), C(14, 1), C(15, 2), C(15, 3)]).kind === 'pairs', 'A-2 连对合法');
 ok(classify([C(3), C(5), C(7)]) === null, '不连续不是顺子');
 
 console.log('== 比大小 ==');
@@ -26,6 +28,18 @@ ok(canBeat({ kind: 'quad', rank: 4, len: 4 }, { kind: 'triple', rank: 14, len: 3
 ok(!canBeat({ kind: 'single', rank: 15, len: 1 }, { kind: 'single', rank: 15, len: 1 }), '同点不能压');
 ok(!canBeat({ kind: 'straight', rank: 10, len: 4 }, { kind: 'straight', rank: 10, len: 5 }), '不同长度顺子不能互压');
 ok(canBeat({ kind: 'pair', rank: 15, len: 2 }, { kind: 'pair', rank: 14, len: 2 }), '对2 > 对A');
+ok(canBeat({ kind: 'single', rank: 3, len: 1 }, { kind: 'single', rank: 15, len: 1 }), '3 > 2');
+ok(canBeat({ kind: 'single', rank: 5, len: 1 }, { kind: 'single', rank: 4, len: 1 }), '5 > 4');
+ok(canBeat({ kind: 'single', rank: 5, len: 1 }, { kind: 'single', rank: 5, len: 1 }), '5 可以压 5');
+ok(canBeat({ kind: 'pair', rank: 5, len: 2 }, { kind: 'pair', rank: 5, len: 2 }), '对5 可以压对5');
+ok(!canBeat({ kind: 'single', rank: 6, len: 1 }, { kind: 'single', rank: 5, len: 1 }), '6 不能压 5');
+
+const ordered = [C(5), C(3), C(15), C(6), C(14), C(4)];
+sortHand(ordered);
+ok(ordered.map(c => c.rank).join(',') === '4,6,14,15,3,5', '手牌按 4、6…A、2、3、5 排序');
+
+const fiveHint = findHint([C(5, 1)], { kind: 'single', rank: 5, len: 1 });
+ok(fiveHint && fiveHint[0].rank === 5, '提示能找到另一张 5 压 5');
 
 console.log('== 整局模拟（随机 20 局）==');
 for (let t = 0; t < 20; t++) {

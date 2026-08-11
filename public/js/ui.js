@@ -30,6 +30,14 @@ function mini(c) {
   return `<span class="mcard${(c.suit === 1 || c.suit === 3) ? ' red' : ''}">${SUITS[c.suit]}${rankChar(c.rank)}</span>`;
 }
 
+function tableCard(c) {
+  const red = c.suit === 1 || c.suit === 3;
+  return `<div class="table-card${red ? ' red' : ''}">
+    <span class="table-rank">${rankChar(c.rank)}</span>
+    <span class="table-suit">${SUITS[c.suit]}</span>
+  </div>`;
+}
+
 /* ---------------- 事件绑定 ---------------- */
 
 export function init() {
@@ -139,12 +147,24 @@ function lobbyHtml(v) {
 function gameHtml(v) {
   const seatName = s => (v.players[s] ? esc(v.players[s].name) : '?');
   const offline = v.players.filter(p => !p.connected);
-  const chips = v.players.filter(p => !p.isMe).map(p => chipHtml(v, p)).join('');
+  const opponents = [];
+  for (let offset = 1; offset < v.players.length; offset++) {
+    opponents.push(v.players[(v.mySeat + offset) % v.players.length]);
+  }
+  const positions = {
+    1: ['seat-top'],
+    2: ['seat-top-left', 'seat-top-right'],
+    3: ['seat-left', 'seat-top', 'seat-right'],
+    4: ['seat-left-high', 'seat-left-low', 'seat-right-high', 'seat-right-low'],
+    5: ['seat-left-high', 'seat-left-low', 'seat-top', 'seat-right-high', 'seat-right-low'],
+  }[opponents.length] || [];
+  const chips = opponents.map((player, index) => chipHtml(v, player, positions[index])).join('');
   const myTurn = v.phase === 'playing' && v.turnSeat === v.mySeat;
 
   const center = v.pending
-    ? `<div class="pending"><b>${seatName(v.pending.seat)}</b> 出【${v.pending.name}】：${v.pending.cards.map(mini).join('')}</div>`
-    : `<div class="pending dim">${myTurn ? '轮到你首出，可出任意合法牌型' : `等待 ${seatName(v.turnSeat)} 出牌…`}</div>`;
+    ? `<div class="trick-owner"><b>${seatName(v.pending.seat)}</b><span>${v.pending.name}</span></div>
+       <div class="table-cards">${v.pending.cards.map(tableCard).join('')}</div>`
+    : `<div class="table-empty">${myTurn ? '由你首出' : `等待 ${seatName(v.turnSeat)} 出牌`}</div>`;
 
   const myLa = v.lastActions[v.mySeat];
   const myAct = myLa ? (myLa.type === 'pass' ? '你：过牌' : `你：${myLa.cards.map(mini).join('')}`) : '';
@@ -152,8 +172,8 @@ function gameHtml(v) {
   let secret = '';
   if (v.mySecret) {
     secret = v.mySecret.solo
-      ? '<div class="secret">🂡 你拿到了黑桃5 —— 本局独庄，独自对抗所有闲家！</div>'
-      : '<div class="secret">🂡 你是黑五（黑桃5持有者），是庄家的秘密队友，可择机明牌</div>';
+      ? '<div class="secret"><b>♠5</b> 你拿到了黑桃5 —— 本局独庄，独自对抗所有闲家！</div>'
+      : '<div class="secret"><b>♠5</b> 你是黑五（黑桃5持有者），是庄家的秘密队友，可择机明牌</div>';
   }
 
   const hand = v.myHand.map(c => `
@@ -169,25 +189,34 @@ function gameHtml(v) {
       <span>第 ${v.round} 局</span><span>庄家：${seatName(v.dealerSeat)}</span><span>${status}</span>
     </div>
     ${offline.length ? `<div class="banner">⚠ ${offline.map(p => esc(p.name)).join('、')} 掉线，等待重新连接…</div>` : ''}
-    <div class="chips">${chips}</div>
-    <div class="center">${center}</div>
-    <div class="myact">${myAct}</div>
+    <div class="table-wrap">
+      <div class="table-felt">
+        ${chips}
+        <div class="table-center">
+          ${center}
+          <div class="table-turn${myTurn ? ' mine' : ''}">${status}</div>
+        </div>
+      </div>
+    </div>
     ${secret}
-    <div class="hand">${hand}</div>
-    <div class="controls">
-      <button data-act="hint" ${myTurn ? '' : 'disabled'}>提示</button>
-      <button class="primary" data-act="play" ${myTurn ? '' : 'disabled'}>出牌</button>
-      <button data-act="pass" ${canPass ? '' : 'disabled'}>不出</button>
-      ${v.canReveal ? '<button class="accent" data-act="reveal">明牌：我是黑五</button>' : ''}
+    <div class="self-zone">
+      <div class="myact">${myAct}</div>
+      <div class="hand">${hand}</div>
+      <div class="controls">
+        <button data-act="hint" ${myTurn ? '' : 'disabled'}>提示</button>
+        <button class="primary" data-act="play" ${myTurn ? '' : 'disabled'}>出牌</button>
+        <button data-act="pass" ${canPass ? '' : 'disabled'}>不出</button>
+        ${v.canReveal ? '<button class="accent" data-act="reveal">明牌：我是黑五</button>' : ''}
+      </div>
     </div>
   </div>`;
 }
 
-function chipHtml(v, p) {
+function chipHtml(v, p, position) {
   const seat = v.players.indexOf(p);
   const la = v.lastActions[seat];
   const turn = v.phase === 'playing' && v.turnSeat === seat;
-  const cls = ['chip'];
+  const cls = ['chip', position];
   if (turn) cls.push('turn');
   if (!p.connected) cls.push('off');
   if (p.outRank) cls.push('out');
@@ -199,7 +228,7 @@ function chipHtml(v, p) {
     ? `<span class="meta finish">${posName(p.outRank, v.n)}</span>`
     : `<span class="meta">${p.count} 张</span>`;
   const act = la
-    ? (la.type === 'pass' ? '<span class="act pass">过</span>' : `<span class="act">${la.cards.map(mini).join('')}</span>`)
+    ? (la.type === 'pass' ? '<span class="act pass">过牌</span>' : '<span class="act">已出牌</span>')
     : '';
   return `<div class="${cls.join(' ')}">
     <div class="cname">${esc(p.name)}${tags}</div>

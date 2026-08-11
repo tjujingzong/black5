@@ -20,6 +20,9 @@ Cloudflare Workers；每个房间由一个 SQLite-backed Durable Object 承载�
 - 每位玩家只收到自己有权查看的手牌和隐藏身份信息。
 - 房间无连接 6 小时后自动清理。
 - 彻底移除 PeerJS/WebRTC 依赖；当前版本不提供实时语音。
+- 牌力从小到大为 `4、6、7、8、9、10、J、Q、K、A、2、3、5`，同牌型的 5 可以压 5。
+- 大尺寸中央牌桌将其他玩家分布在边缘，当前一手牌集中显示在桌心。
+- 内置浏览器合成的操作音效和低音量循环 BGM，可在房间右上角随时关闭。
 
 ## 项目结构
 
@@ -30,6 +33,7 @@ public/                 浏览器静态资源
   js/
     main.js             页面入口与断线重连
     net.js              Cloudflare WebSocket 客户端
+    audio.js            Web Audio 音效与 BGM
     engine.js           权威游戏状态机（Worker 与测试共用）
     rules.js            牌型与比较规则
     cards.js            牌库定义
