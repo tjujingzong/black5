@@ -175,21 +175,39 @@ ok(audioCalls.filter(name => name === 'blackFive').length === 2
   '自爆黑五与打出黑桃5都会触发专属音效和语音');
 
 console.log('== 计分与人机 ==');
+// 平局：庄家阵营一头科一大落，名次分相抵
 const zeroGame = new Game();
 zeroGame.players = [
-  { id: 'd', name: '庄家', hand: [], outRank: 2, score: 10 },
+  { id: 'd', name: '庄家', hand: [], outRank: 1, score: 10 },
   { id: 'b', name: '黑五', hand: [], outRank: 3, score: 10 },
-  { id: 'x', name: '闲家', hand: [], outRank: 1, score: 10 },
+  { id: 'x', name: '闲家', hand: [], outRank: 2, score: 10 },
 ];
 zeroGame.dealer = 0;
 zeroGame.blackFiveSeat = 1;
 zeroGame.solo = false;
-zeroGame.winTeam = 'B';
+zeroGame.winTeam = 'A';
 zeroGame.rankCount = 3;
 zeroGame.phase = 'playing';
 zeroGame.finishRound();
-ok(zeroGame.result.zeroRound && zeroGame.result.rows.every(row => row.delta === 0), '庄家不是大落时全员记 0 分');
-ok(zeroGame.players.every(player => player.score === 10), '0 分局不改变累计积分');
+ok(zeroGame.result.zeroRound && zeroGame.result.rows.every(row => row.delta === 0), '阵营一头科一大落名次相抵为平局，全员 0 分');
+ok(zeroGame.players.every(player => player.score === 10), '平局不改变累计积分');
+
+// 独庄庄家头科为红庄，应加分（非平局）
+const soloWinGame = new Game();
+soloWinGame.players = [
+  { id: 'd', name: '庄家', hand: [], outRank: 1, score: 0 },
+  { id: 'x', name: '闲家甲', hand: [], outRank: 2, score: 0 },
+  { id: 'y', name: '闲家乙', hand: [], outRank: 3, score: 0 },
+];
+soloWinGame.dealer = 0;
+soloWinGame.blackFiveSeat = 0;
+soloWinGame.solo = true;
+soloWinGame.winTeam = 'A';
+soloWinGame.rankCount = 3;
+soloWinGame.phase = 'playing';
+soloWinGame.finishRound();
+ok(!soloWinGame.result.zeroRound, '独庄庄家头科为红庄，非平局');
+ok(soloWinGame.players[0].score > 0, '独庄庄家头科应加分');
 
 const scoredGame = new Game();
 scoredGame.players = [

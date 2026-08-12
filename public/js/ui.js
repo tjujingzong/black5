@@ -291,8 +291,8 @@ function gameHtml(v) {
       <div class="controls">
         <button class="hint-button" data-act="hint" ${myTurn ? '' : 'disabled'}>提示</button>
         <button class="pass-button" data-act="pass" ${canPass ? '' : 'disabled'}>过牌</button>
-        ${v.canReveal ? '<button class="accent" data-act="reveal">明牌：我是黑五</button>' : ''}
         <button class="primary play-button" data-act="play" ${myTurn ? '' : 'disabled'}>出牌${selected.size ? ` · ${selected.size}` : ''}</button>
+        ${v.canReveal ? '<button class="accent" data-act="reveal">明牌：我是黑五</button>' : ''}
       </div>
     </div>
     ${propMenuHtml(v)}
@@ -438,7 +438,7 @@ function resultHtml(v) {
       <td class="${x.delta > 0 ? 'plus' : x.delta < 0 ? 'minus' : ''}">${x.delta > 0 ? '+' : ''}${x.delta}</td>
       <td>${x.score}</td>
     </tr>`).join('');
-  const win = r.zeroRound ? '庄家不是大落 · 全员 0 分' : r.winTeam === 'A' ? '庄家阵营获胜' : '闲家阵营获胜';
+  const win = r.zeroRound ? '双方名次相抵 · 平局 0 分' : r.winTeam === 'A' ? '庄家阵营获胜' : '闲家阵营获胜';
   const b5name = v.blackFiveSeat != null && v.players[v.blackFiveSeat] ? esc(v.players[v.blackFiveSeat].name) : '—';
   const btns = v.isHost
     ? '<button class="primary big" data-act="next">下一局</button><button data-act="lobby">返回大厅</button>'

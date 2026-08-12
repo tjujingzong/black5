@@ -417,7 +417,7 @@ export class Game {
     // 名次基础分：5 人局为 头科+10 / 二科+5 / 三科0 / 四科-5 / 大落-10，其他人数等差展开
     const posPts = pos => (n - 1 - 2 * (pos - 1)) * 5;
     const sumA = teamA.reduce((s, seat) => s + posPts(this.players[seat].outRank), 0);
-    const zeroRound = this.players[this.dealer].outRank !== n;
+    const zeroRound = sumA === 0; // 双方名次分相抵为平局（如一头科一大落），否则按名次结算
     const mult = this.solo ? 2 : 1;
     const rows = this.players.map((p, i) => {
       const inA = teamA.includes(i);
@@ -430,7 +430,7 @@ export class Game {
     this.result = { winTeam: this.winTeam, solo: this.solo, zeroRound, rows };
     this.phase = 'roundEnd';
     this.pushLog(zeroRound
-      ? '本局结束：庄家不是大落，全员记 0 分'
+      ? '本局结束：双方名次相抵，平局记 0 分'
       : `本局结束：${this.winTeam === 'A' ? '庄家阵营' : '闲家阵营'}获胜${this.solo ? '（独庄，分数翻倍）' : ''}`);
   }
 
