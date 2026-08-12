@@ -91,7 +91,9 @@ console.log('== 出牌播报 ==');
 for (const rank of [15, 3, 4, 5]) {
   ok(comboSpeech({ kind: 'single', rank }) === ({ 15: '2', 3: '3', 4: '4', 5: '5' })[rank], `单张 ${rank === 15 ? 2 : rank} 点数播报`);
 }
-ok(comboSpeech({ kind: 'pair', rank: 14 }) === '对A', '对子会播报具体点数');
+ok(comboSpeech({ kind: 'single', rank: 11 }) === '勾', 'J 点数播报为勾');
+ok(comboSpeech({ kind: 'single', rank: 14 }) === '尖', 'A 点数播报为尖');
+ok(comboSpeech({ kind: 'pair', rank: 14 }) === '对尖', '对子 A 播报为对尖');
 ok(comboSpeech({ kind: 'straight', rank: 14 }) === '顺子', '顺子牌型播报');
 ok(comboSpeech({ kind: 'pairs', rank: 13 }) === '姊妹对', '姊妹对牌型播报');
 ok(comboSpeech({ kind: 'triple', rank: 9 }) === '三个9，炸弹', '三张炸弹播报');
@@ -126,7 +128,9 @@ ok(gameAudio.context?.state === 'running' && gameAudio.userActivated && gameAudi
 ok(MUSIC_TRACKS.length === 3 && new Set(MUSIC_TRACKS.map(track => track.src)).size === 3,
   '随机 BGM 曲库包含三首不重复的本地音乐');
 ok(EFFECT_MEDIA_SOURCES.play.endsWith('/play.wav') && EFFECT_MEDIA_SOURCES.card.endsWith('/card.wav')
-  && VOICE_MEDIA_SOURCES['快点吧，我等得花儿都谢了'].endsWith('/quick-hurry.wav'),
+  && VOICE_MEDIA_SOURCES['快点吧，我等得花儿都谢了'].endsWith('/quick-hurry.wav')
+  && VOICE_MEDIA_SOURCES['你的牌打得太好了'].endsWith('/quick-good-play.wav')
+  && VOICE_MEDIA_SOURCES['就这？'].endsWith('/quick-just-this.wav'),
   '手机牌局音效和快捷语音均使用本地媒体文件');
 const blackFiveTones = [];
 gameAudio.context = { state: 'running', currentTime: 10 };
@@ -235,6 +239,8 @@ ok(botGame.handleMsg(hostId, { t: 'chat', text: ' 本地联机测试 ' }) === nu
   && botGame.chat.at(-1).text === '本地联机测试', '文字聊天会清理首尾空白并保存');
 ok(botGame.handleMsg(hostId, { t: 'quick', text: '一个小单张，不走不健康' }) === null
   && botGame.chat.at(-1).quick, '快捷语音按白名单发送');
+ok(botGame.handleMsg(hostId, { t: 'quick', text: '你的牌打得太好了' }) === null
+  && botGame.handleMsg(hostId, { t: 'quick', text: '就这？' }) === null, '新增快捷语音按白名单发送');
 ok(botGame.handleMsg(hostId, { t: 'quick', text: '任意播报' }) === '快捷语音无效', '拒绝伪造的快捷语音');
 ok(botGame.handleMsg(hostId, { t: 'voiceStatus', enabled: true }) === null
   && botGame.players[0].voice, '真人语音状态会同步');

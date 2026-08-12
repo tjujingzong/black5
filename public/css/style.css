@@ -155,6 +155,23 @@ input:focus { border-color: var(--gold); }
 .game-statusbar b { display: block; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .game-statusbar .round-status { text-align: right; }
 .game-statusbar .round-status.mine b { color: var(--gold); }
+.scoreboard { display: flex; align-items: stretch; margin: 0 0 10px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.scoreboard-title { display: flex; flex: 0 0 84px; flex-direction: column; justify-content: center; gap: 2px; padding: 8px 10px; border-right: 1px solid var(--line); background: var(--surface-2); font-size: 12px; font-weight: 800; }
+.scoreboard-title small { color: var(--muted); font-size: 9px; font-weight: 500; }
+.scoreboard ol { display: flex; flex: 1 1 auto; min-width: 0; margin: 0; padding: 0; list-style: none; overflow-x: auto; }
+.score-row { display: grid; grid-template-columns: 18px 26px minmax(44px, 1fr) auto auto; align-items: center; flex: 1 0 145px; min-width: 145px; gap: 5px; padding: 7px 9px; border-right: 1px solid var(--line); }
+.score-row:last-child { border-right: 0; }
+.score-row.mine { background: rgba(232,184,74,.1); }
+.score-rank { color: var(--muted); font-size: 11px; text-align: center; }
+.score-row img { width: 26px; height: 26px; border: 1px solid #d8ddd5; border-radius: 50%; object-fit: cover; background: #d7eee4; }
+.score-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 700; }
+.score-name small { margin-left: 3px; color: var(--gold); font-size: 9px; }
+.score-roles { display: flex; gap: 2px; }
+.score-role { padding: 1px 3px; border-radius: 3px; font-size: 8px; font-style: normal; white-space: nowrap; }
+.score-role.dealer { background: var(--gold); color: #211a08; }
+.score-role.black-five { background: #090a09; border: 1px solid #777; color: #fff; }
+.score-role.solo { background: #625188; }
+.score-row strong { color: var(--gold); font-size: 15px; }
 .banner {
   width: min(100%, 680px); margin: 8px auto; padding: 8px 12px;
   background: #4c3320; border: 1px solid #825a2c; border-radius: 6px; text-align: center; font-size: 12px;
@@ -360,6 +377,14 @@ td.minus { color: #ff9991; font-weight: 800; }
   .game-statusbar { grid-template-columns: 72px 1fr 1.25fr; margin-bottom: 6px; }
   .game-statusbar > div { padding: 6px 7px; }
   .game-statusbar b { font-size: 11px; }
+  .scoreboard { margin-bottom: 6px; }
+  .scoreboard-title { flex-basis: 54px; padding: 6px 5px; font-size: 10px; }
+  .scoreboard-title small { display: none; }
+  .score-row { grid-template-columns: 14px 22px minmax(36px, 1fr) auto auto; flex-basis: 122px; min-width: 122px; gap: 3px; padding: 5px; }
+  .score-row img { width: 22px; height: 22px; }
+  .score-name { font-size: 9px; }
+  .score-role { padding: 1px 2px; font-size: 7px; }
+  .score-row strong { font-size: 12px; }
   .table-wrap { padding-bottom: 3px; }
   .table-felt { width: 100%; max-width: calc(100vw - 14px); height: clamp(340px, 49svh, 410px); border-width: 6px; border-radius: 24px; }
   .table-felt::after { font-size: 54px; }

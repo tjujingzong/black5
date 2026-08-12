@@ -234,7 +234,15 @@ export class Room {
     const from = this.game.players.find(player => player.id === fromId);
     const to = this.game.players.find(player => player.publicId === data.to);
     const kinds = ['offer', 'answer', 'ice'];
-    if (!from || !to || !from.voice || !to.voice || !kinds.includes(data.kind) || !data.data) return;
+    if (!from || !to || from.isBot || to.isBot || !kinds.includes(data.kind) || !data.data) return;
+    // Offers and their ICE candidates originate from the person broadcasting a microphone.
+    // Answers and their ICE candidates return to that broadcaster from listen-only peers.
+    const validDirection = data.kind === 'offer'
+      ? from.voice
+      : data.kind === 'answer'
+        ? to.voice
+        : from.voice || to.voice;
+    if (!validDirection) return;
     for (const ws of this.state.getWebSockets()) {
       const { playerId } = ws.deserializeAttachment() || {};
       if (playerId === to.id) {

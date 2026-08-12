@@ -59,26 +59,38 @@ export class VoiceChat {
   async update(view) {
     this.myId = view.myId;
     this.players = view.players || [];
+    const connected = new Set(this.players
+      .filter(player => player.id !== this.myId && player.connected && !player.isBot)
+      .map(player => player.id));
+    for (const id of [...this.peers.keys()]) if (!connected.has(id)) this.closePeer(id);
     await this.syncPeers();
   }
 
   async syncPeers() {
     if (!this.enabled || !this.stream || !this.myId) return;
     const active = new Set(this.players
-      .filter(player => player.id !== this.myId && player.connected && player.voice && !player.isBot)
+      .filter(player => player.id !== this.myId && player.connected && !player.isBot)
       .map(player => player.id));
-    for (const id of [...this.peers.keys()]) if (!active.has(id)) this.closePeer(id);
-    for (const id of active) await this.ensurePeer(id, this.myId.localeCompare(id) < 0);
+    // Each person who enables their microphone publishes one stream to every human player.
+    // Listeners do not need to enable their own microphone to receive it.
+    for (const id of active) {
+      const player = this.players.find(item => item.id === id);
+      // One deterministic side starts when both users are speaking. If the other
+      // person is only listening, the broadcaster starts regardless of ID order.
+      const record = this.peers.get(id);
+      const needsRenegotiation = this.stream && !record?.localTracksAdded && record?.pc.remoteDescription;
+      const initiate = needsRenegotiation || !player?.voice || this.myId.localeCompare(id) < 0;
+      await this.ensurePeer(id, initiate);
+    }
   }
 
   async ensurePeer(id, initiate = false) {
-    if (!this.enabled || !this.stream) return null;
+    if (!id) return null;
     let record = this.peers.get(id);
     if (!record) {
       const pc = new PeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-      record = { pc, audio: null, pendingIce: [], offered: false };
+      record = { pc, audio: null, pendingIce: [], offered: false, localTracksAdded: false, needsOffer: false };
       this.peers.set(id, record);
-      for (const track of this.stream.getTracks()) pc.addTrack(track, this.stream);
       pc.addEventListener('icecandidate', event => {
         if (event.candidate) this.signal(id, 'ice', event.candidate.toJSON());
       });
@@ -95,8 +107,14 @@ export class VoiceChat {
         if (['failed', 'closed'].includes(pc.connectionState)) this.closePeer(id);
       });
     }
-    if (initiate && !record.offered && record.pc.signalingState === 'stable') {
+    if (this.stream && !record.localTracksAdded) {
+      for (const track of this.stream.getTracks()) record.pc.addTrack(track, this.stream);
+      record.localTracksAdded = true;
+      record.needsOffer = true;
+    }
+    if (initiate && record.needsOffer && record.pc.signalingState === 'stable') {
       record.offered = true;
+      record.needsOffer = false;
       const offer = await record.pc.createOffer();
       await record.pc.setLocalDescription(offer);
       this.signal(id, 'offer', record.pc.localDescription.toJSON());
@@ -105,17 +123,25 @@ export class VoiceChat {
   }
 
   async handleSignal(message) {
-    if (!this.enabled || !message?.from) return;
+    if (!message?.from || !message.kind || !message.data) return;
     try {
       const record = await this.ensurePeer(message.from, false);
       if (!record) return;
       if (message.kind === 'offer') {
+        if (record.pc.signalingState !== 'stable') {
+          // Simultaneous microphone activation can create two offers. The lower
+          // public ID keeps its outgoing offer; the other side rolls back.
+          if (this.myId && this.myId.localeCompare(message.from) < 0) return;
+          await record.pc.setLocalDescription({ type: 'rollback' });
+        }
         await record.pc.setRemoteDescription(message.data);
         const answer = await record.pc.createAnswer();
         await record.pc.setLocalDescription(answer);
+        record.needsOffer = false;
         this.signal(message.from, 'answer', record.pc.localDescription.toJSON());
         await this.flushIce(record);
       } else if (message.kind === 'answer') {
+        if (!record.offered) return;
         await record.pc.setRemoteDescription(message.data);
         await this.flushIce(record);
       } else if (message.kind === 'ice') {

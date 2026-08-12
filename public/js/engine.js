@@ -10,7 +10,13 @@ import { classify, canBeat, comboName, posName, findHint } from './rules.js';
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 6;
 export const TURN_SECONDS = 20;
-export const QUICK_PHRASES = ['心态崩了啊', '一个小单张，不走不健康', '快点吧，我等得花儿都谢了'];
+export const QUICK_PHRASES = [
+  '心态崩了啊',
+  '一个小单张，不走不健康',
+  '快点吧，我等得花儿都谢了',
+  '你的牌打得太好了',
+  '就这？',
+];
 export const PASS_PHRASES = ['pass', '要不起', '不要'];
 export const INTERACTION_ITEMS = ['tomato', 'bucket'];
 export const AVATAR_IDS = ['bamboo', 'cloud', 'jade', 'lotus', 'moon', 'pepper', 'plum', 'tiger'];

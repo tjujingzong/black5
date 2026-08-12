@@ -32,6 +32,8 @@ export const VOICE_MEDIA_SOURCES = Object.freeze({
   '心态崩了啊': '/audio/voice/quick-mindset.wav',
   '一个小单张，不走不健康': '/audio/voice/quick-single.wav',
   '快点吧，我等得花儿都谢了': '/audio/voice/quick-hurry.wav',
+  '你的牌打得太好了': '/audio/voice/quick-good-play.wav',
+  '就这？': '/audio/voice/quick-just-this.wav',
   pass: '/audio/voice/pass-en.wav',
   '要不起': '/audio/voice/pass-cannot.wav',
   '不要': '/audio/voice/pass-no.wav',
@@ -370,10 +372,17 @@ class GameAudio {
       this.voice(frequency, now + offset, duration, volume, type, this.effectGain);
     switch (name) {
       case 'click': tone(420, 0, 0.05, 0.1); break;
-      case 'card': tone(210, 0, 0.07, 0.14, 'triangle'); tone(160, 0.045, 0.06, 0.08); break;
+      case 'card':
+        tone(920, 0, 0.035, 0.07, 'square');
+        tone(1240, 0.025, 0.025, 0.045, 'square');
+        break;
       case 'join': tone(392, 0, 0.1); tone(523.25, 0.09, 0.16); break;
       case 'ready': tone(440, 0, 0.08); tone(554.37, 0.07, 0.11); break;
-      case 'play': tone(196, 0, 0.09, 0.2, 'triangle'); tone(246.94, 0.065, 0.12, 0.14); break;
+      case 'play':
+        this.noise(now, 0.12, 0.17, 'lowpass', 850);
+        tone(128, 0, 0.16, 0.25, 'sine');
+        tone(92, 0.055, 0.2, 0.16, 'triangle');
+        break;
       case 'pass': tone(260, 0, 0.06, 0.08); tone(190, 0.05, 0.1, 0.08, 'triangle'); break;
       case 'blackFive':
         tone(110, 0, 0.3, 0.24, 'sawtooth');
@@ -385,12 +394,14 @@ class GameAudio {
       case 'result': tone(392, 0, 0.2); tone(523.25, 0.12, 0.22); tone(659.25, 0.24, 0.3); break;
       case 'error': tone(180, 0, 0.12, 0.2, 'sawtooth'); tone(145, 0.1, 0.18, 0.14, 'sawtooth'); break;
       case 'tomato':
-        this.noise(now, 0.24, 0.34, 'lowpass', 480);
-        tone(150, 0.02, 0.13, 0.2, 'triangle');
+        this.noise(now, 0.34, 0.38, 'lowpass', 310);
+        tone(82, 0.01, 0.23, 0.22, 'sine');
         break;
       case 'bucket':
-        this.noise(now, 0.52, 0.24, 'bandpass', 1100);
-        tone(620, 0, 0.12, 0.1); tone(360, 0.09, 0.18, 0.12); tone(190, 0.2, 0.25, 0.13);
+        this.noise(now, 0.7, 0.32, 'highpass', 1600);
+        tone(1040, 0, 0.08, 0.12, 'square');
+        tone(780, 0.13, 0.11, 0.1, 'square');
+        tone(520, 0.27, 0.16, 0.12, 'triangle');
         break;
     }
   }

@@ -270,6 +270,7 @@ function gameHtml(v) {
       <div><small>庄家</small><b>${seatName(v.dealerSeat)}</b></div>
       <div class="round-status${myTurn ? ' mine' : ''}"><small>当前</small><b>${status}</b></div>
     </div>
+    ${scoreboardHtml(v)}
     ${offline.length ? `<div class="banner">⚠ ${offline.map(p => esc(p.name)).join('、')} 掉线，等待重新连接…</div>` : ''}
     <div class="table-wrap">
       <div class="table-felt">
@@ -297,6 +298,29 @@ function gameHtml(v) {
     </div>
     ${propMenuHtml(v)}
   </div>`;
+}
+
+function scoreboardHtml(v) {
+  const rows = v.players
+    .map((player, seat) => ({ player, seat }))
+    .sort((a, b) => b.player.score - a.player.score || a.seat - b.seat)
+    .map(({ player, seat }, index) => {
+      let role = '';
+      if (player.isDealer) role += '<i class="score-role dealer">庄家</i>';
+      if (player.isBlackFive || (player.isMe && v.mySecret && !v.mySecret.solo)) role += '<i class="score-role black-five">黑五</i>';
+      if (v.publicSolo && player.isDealer) role += '<i class="score-role solo">独庄</i>';
+      return `<li class="score-row${player.isMe ? ' mine' : ''}">
+        <b class="score-rank">${index + 1}</b>
+        <img src="${avatarSrc(player.avatar)}" alt="">
+        <span class="score-name">${esc(player.name)}${player.isMe ? '<small>我</small>' : ''}</span>
+        <span class="score-roles">${role}</span>
+        <strong>${player.score}</strong>
+      </li>`;
+    }).join('');
+  return `<section class="scoreboard" aria-label="积分榜">
+    <div class="scoreboard-title"><span>积分榜</span><small>按积分排序</small></div>
+    <ol>${rows}</ol>
+  </section>`;
 }
 
 function chipHtml(v, p, position) {

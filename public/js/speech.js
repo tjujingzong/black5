@@ -1,8 +1,14 @@
 import { rankChar } from './cards.js';
 
+function spokenRank(rank) {
+  if (rank === 11) return '勾';
+  if (rank === 14) return '尖';
+  return rankChar(rank);
+}
+
 export function comboSpeech(combo) {
   if (!combo) return '';
-  const rank = rankChar(combo.rank);
+  const rank = spokenRank(combo.rank);
   return {
     single: rank,
     pair: `对${rank}`,
