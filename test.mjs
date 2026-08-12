@@ -132,6 +132,8 @@ ok(EFFECT_MEDIA_SOURCES.play.endsWith('/play.wav') && EFFECT_MEDIA_SOURCES.card.
   && VOICE_MEDIA_SOURCES['你的牌打得太好了'].endsWith('/quick-good-play.wav')
   && VOICE_MEDIA_SOURCES['就这？'].endsWith('/quick-just-this.wav'),
   '手机牌局音效和快捷语音均使用本地媒体文件');
+ok(VOICE_MEDIA_SOURCES['你的牌打得太好了'].endsWith('/quick-good-play.wav')
+  && VOICE_MEDIA_SOURCES['就这？'].endsWith('/quick-just-this.wav'), '新增快捷语音资源已接入');
 const blackFiveTones = [];
 gameAudio.context = { state: 'running', currentTime: 10 };
 gameAudio.effectGain = {};

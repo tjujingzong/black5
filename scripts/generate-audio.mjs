@@ -71,26 +71,16 @@ await save('public/audio/sfx/play.wav', make(0.34, (t, i) => {
   return e * (tone(t, 118) * 0.3 + noise(i) * 0.16 * Math.exp(-t * 8));
 }));
 
-// Wet splat and metallic water splash intentionally occupy different frequency ranges.
+// Wet splat: a short low-frequency impact followed by a soft, quickly fading tail.
 await save('public/audio/sfx/tomato.wav', make(0.46, (t, i) => {
-  const e = envelope(t, 0.46, 0.004, 0.28);
-  return e * (tone(t, 72) * 0.3 + noise(i) * 0.28 * Math.exp(-t * 6));
+  const impact = Math.exp(-t * 28) * (tone(t, 94) * 0.65 + tone(t, 173) * 0.22);
+  const pulp = noise(i) * 0.2 * Math.exp(-t * 10);
+  return impact + pulp;
 }));
+// Bucket: a bright rim hit followed by a longer, rippling water stream.
 await save('public/audio/sfx/bucket.wav', make(0.78, (t, i) => {
-  const e = envelope(t, 0.78, 0.004, 0.3);
-  const splash = noise(i) * 0.2 * (0.55 + 0.45 * Math.sin(2 * Math.PI * 19 * t));
-  const metal = t < 0.12 ? tone(t, 1080) * 0.2 : 0;
-  return e * (splash + metal + tone(t, 420 - t * 180) * 0.08);
+  const metal = Math.exp(-t * 32) * tone(t, 1450) * 0.42;
+  const water = noise(i) * (0.12 + 0.08 * Math.sin(2 * Math.PI * 24 * t)) * Math.exp(-t * 2.7);
+  const ripple = tone(t, 520 - t * 170) * 0.12 * Math.exp(-t * 2.2);
+  return metal + water + ripple;
 }));
-
-// These local prompts keep working on mobile even when browser speech synthesis is unavailable.
-await save('public/audio/voice/quick-good-play.wav', chirp(1.1, [
-  { at: 0.05, length: 0.18, frequency: 420 },
-  { at: 0.29, length: 0.2, frequency: 570 },
-  { at: 0.57, length: 0.22, frequency: 680 },
-  { at: 0.84, length: 0.17, frequency: 810 },
-], 0.2));
-await save('public/audio/voice/quick-just-this.wav', chirp(0.72, [
-  { at: 0.04, length: 0.2, frequency: 680 },
-  { at: 0.31, length: 0.25, frequency: 390 },
-], 0.24));

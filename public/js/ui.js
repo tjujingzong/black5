@@ -259,6 +259,7 @@ function gameHtml(v) {
           <span class="cr">${rankChar(card.rank)}</span><span class="cs">${SUITS[card.suit]}</span>
         </div>`).join('')}
     </div>`).join('');
+  const handMetrics = handLayout(groupedHand.length);
 
   const canPass = myTurn && !!v.pending;
   const status = v.phase !== 'playing' ? '本局已结束' : myTurn ? '轮到你出牌' : `等待 ${seatName(v.turnSeat)} 出牌`;
@@ -288,7 +289,7 @@ function gameHtml(v) {
         <span>${esc(me.name)}</span>${me.voice ? '<i class="voice-mark">语音中</i>' : ''}
       </div>
       <div class="myact">${myAct}</div>
-      <div class="hand" style="--hand-groups:${groupedHand.length}">${hand}</div>
+      <div class="hand" style="--hand-groups:${groupedHand.length};--group-step:${handMetrics.step}px;--card-width:${handMetrics.width}px;--card-height:${handMetrics.height}px">${hand}</div>
       <div class="controls">
         <button class="hint-button" data-act="hint" ${myTurn ? '' : 'disabled'}>提示</button>
         <button class="pass-button" data-act="pass" ${canPass ? '' : 'disabled'}>过牌</button>
@@ -397,9 +398,18 @@ function logHtml(v) {
 
 function turnClockHtml(v, mine) {
   if (v.phase !== 'playing' || !Number.isFinite(v.turnDeadline)) return '';
-  return `<div class="turn-clock${mine ? ' mine' : ''}" data-turn-deadline="${v.turnDeadline}" data-turn-seconds="${v.turnSeconds || 20}" role="timer" aria-label="出牌倒计时">
+  return `<div class="turn-clock${mine ? ' mine' : ''}" data-turn-deadline="${v.turnDeadline}" data-turn-seconds="${v.turnSeconds || 20}" role="timer" aria-label="${mine ? '你的回合，出牌倒计时' : '对手回合，出牌倒计时'}">
+    <strong class="turn-owner">${mine ? '你的回合' : '对手回合'}</strong>
     <span>20</span><small>秒</small>
   </div>`;
+}
+
+function handLayout(groupCount) {
+  const viewport = Number(globalThis.innerWidth) || 390;
+  if (viewport > 560) return { step: 70, width: 70, height: 100 };
+  const available = Math.max(320, viewport - 14);
+  const step = Math.max(29, Math.min(62, available / Math.max(1, groupCount)));
+  return { step: Math.round(step * 10) / 10, width: Math.round(Math.max(46, Math.min(62, step + 10))), height: 88 };
 }
 
 function updateTurnClocks() {
@@ -413,7 +423,7 @@ function updateTurnClocks() {
     clock.classList.toggle('urgent', seconds <= 5);
     const number = clock.querySelector('span');
     if (number) number.textContent = String(seconds);
-    clock.setAttribute('aria-label', `出牌倒计时 ${seconds} 秒`);
+    clock.setAttribute('aria-label', `${clock.classList.contains('mine') ? '你的回合' : '对手回合'}，出牌倒计时 ${seconds} 秒`);
   });
 }
 

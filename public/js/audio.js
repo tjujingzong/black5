@@ -534,9 +534,12 @@ class GameAudio {
       this.play('blackFive');
       this.speak(action.text);
     }
+    if (previous.turn !== next.turn && next.turn === next.mine && next.phase === 'playing') {
+      this.play('turn');
+      this.speak('轮到你出牌');
+    }
     if (previous.phase !== 'roundEnd' && next.phase === 'roundEnd') this.play('result');
     else if (previous.phase !== 'playing' && next.phase === 'playing') this.play('start');
-    else if (!action && previous.turn !== next.turn && next.turn === next.mine) this.play('turn');
     else if (next.players > previous.players) this.play('join');
     else if (next.ready > previous.ready) this.play('ready');
     if (next.quickId > previous.quickId && next.quick?.quick) this.speak(next.quick.text);

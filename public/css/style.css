@@ -240,10 +240,14 @@ input:focus { border-color: var(--gold); }
 }
 .turn-clock::before { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: #13261f; }
 .turn-clock.mine { border-color: var(--gold); }
+.turn-clock.mine::after { content: ""; position: absolute; inset: -7px; border: 2px solid rgba(232,184,74,.65); border-radius: 50%; animation: turn-ring 1.25s ease-in-out infinite; }
 .turn-clock.urgent { border-color: var(--red); color: #ffaaa2; background: conic-gradient(var(--red) 0 var(--turn-angle), #594342 var(--turn-angle) 360deg); animation: clock-pulse .75s ease-in-out infinite alternate; }
+.turn-clock .turn-owner { position: absolute; left: 50%; top: -25px; z-index: 2; transform: translateX(-50%); width: max-content; padding: 3px 7px; border-radius: 4px; background: var(--gold); color: #211a08; font-size: 11px; line-height: 1; white-space: nowrap; }
+.turn-clock:not(.mine) .turn-owner { background: rgba(20,28,23,.9); color: var(--muted); border: 1px solid #53655a; }
 .turn-clock span { position: relative; z-index: 1; font-size: 21px; font-weight: 900; line-height: 1; }
 .turn-clock small { position: relative; z-index: 1; margin-left: 2px; font-size: 9px; }
 @keyframes clock-pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+@keyframes turn-ring { 0%, 100% { opacity: .35; transform: scale(.98); } 50% { opacity: 1; transform: scale(1.04); } }
 .trick-owner { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 9px; font-size: 12px; }
 .trick-owner b { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
 .trick-owner span { padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,.12); }
@@ -267,18 +271,18 @@ input:focus { border-color: var(--gold); }
 .myact { min-height: 23px; margin-bottom: 2px; color: var(--muted); text-align: center; font-size: 11px; }
 .mcard { display: inline-block; margin: 1px; padding: 1px 5px; border-radius: 4px; background: #fff; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,.4); font-size: 11px; font-weight: 700; }
 .hand {
-  --stack-offset: 50px;
+  --stack-offset: 50px; --group-step: 70px; --card-width: 70px; --card-height: 100px;
   display: flex; justify-content: center; align-items: flex-end;
   min-height: 166px; padding: 14px 8px 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
 }
 .card-group {
-  position: relative; flex: 1 1 34px; width: 70px; min-width: 30px; max-width: 70px;
-  height: calc(100px + (var(--group-size) - 1) * var(--stack-offset));
+  position: relative; flex: 0 0 var(--group-step); width: var(--group-step); min-width: var(--group-step); max-width: var(--group-step);
+  height: calc(var(--card-height) + (var(--group-size) - 1) * var(--stack-offset));
 }
-.card-group:last-child { flex: 0 0 70px; min-width: 70px; }
+.card-group:last-child { margin-right: calc(var(--card-width) - var(--group-step)); }
 .card {
   position: absolute; left: 0; top: calc((var(--group-size) - 1 - var(--card-index)) * var(--stack-offset)); z-index: calc(var(--group-size) - var(--card-index));
-  width: 70px; height: 100px;
+  width: var(--card-width); height: var(--card-height);
   border: 1px solid #8a8a85; border-radius: 7px; background: #fff; color: #111;
   box-shadow: 0 3px 6px rgba(0,0,0,.36); cursor: pointer; user-select: none;
   transition: transform .12s, box-shadow .12s;
@@ -421,9 +425,7 @@ td.minus { color: #ff9991; font-weight: 800; }
   .self-profile .avatar-static { width: 24px; height: 24px; }
   .myact { min-height: 18px; }
   .hand { width: 100%; min-height: 150px; --stack-offset: 44px; justify-content: flex-start; padding: 12px 3px 3px; }
-  .card-group { flex-basis: 28px; width: 62px; min-width: 26px; max-width: 62px; height: calc(88px + (var(--group-size) - 1) * var(--stack-offset)); }
-  .card-group:last-child { flex-basis: 62px; min-width: 62px; }
-  .card { width: 62px; height: 88px; }
+  .card-group { height: calc(var(--card-height) + (var(--group-size) - 1) * var(--stack-offset)); }
   .card .cr { left: 6px; top: 5px; font-size: 17px; }
   .card .cs { left: 6px; top: 30px; font-size: 24px; }
   .controls { grid-template-columns: minmax(64px,.8fr) minmax(70px,.9fr) minmax(94px,1.2fr); gap: 6px; padding: 7px 0 3px; }
