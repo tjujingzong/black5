@@ -1,4 +1,4 @@
-// 房间语音：Cloudflare Durable Object 负责信令，媒体由浏览器 WebRTC 传输。
+// 房间语音：房间服务负责信令，媒体由浏览器点对点传输。
 const PeerConnection = globalThis.RTCPeerConnection;
 
 export class VoiceChat {
@@ -75,7 +75,7 @@ export class VoiceChat {
     if (!this.enabled || !this.stream) return null;
     let record = this.peers.get(id);
     if (!record) {
-      const pc = new PeerConnection({ iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }] });
+      const pc = new PeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
       record = { pc, audio: null, pendingIce: [], offered: false };
       this.peers.set(id, record);
       for (const track of this.stream.getTracks()) pc.addTrack(track, this.stream);

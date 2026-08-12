@@ -1,10 +1,10 @@
-// 界面渲染：完全由 Cloudflare 房间服务下发的玩家视图驱动。
+// 界面渲染：完全由房间服务下发的玩家视图驱动。
 import { classify, canBeat, findHint, posName } from './rules.js';
 import { SUITS, rankChar } from './cards.js';
 import { QUICK_PHRASES } from './engine.js';
 
 let cur = null;          // 当前视图
-let send = () => {};     // 通过 WebSocket 向权威房间服务发送动作
+let send = () => {};     // 通过实时连接向权威房间服务发送动作
 let roomCode = '';
 const selected = new Set(); // 选中的手牌 id
 let chatDraft = '';

@@ -1,4 +1,4 @@
-// Cloudflare 网络层：所有玩家通过同源 WebSocket 连接房间 Durable Object。
+// 网络层：所有玩家通过同源实时连接接入房间服务。
 
 const CONNECT_TIMEOUT = 15000;
 

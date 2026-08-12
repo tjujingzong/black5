@@ -1,4 +1,4 @@
-// 入口：首页交互 + Cloudflare 房间 WebSocket 装配。
+// 入口：首页交互 + 房间实时连接装配。
 import { createRoom, RoomNet } from './net.js';
 import { init as initUI, render, bindSend, toast, setRoomInfo, showInteraction } from './ui.js?v=20260812b';
 import { gameAudio } from './audio.js?v=20260812b';
