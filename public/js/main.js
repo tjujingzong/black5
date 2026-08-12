@@ -1,7 +1,7 @@
 // 入口：首页交互 + 房间实时连接装配。
 import { createRoom, RoomNet } from './net.js';
-import { init as initUI, render, bindSend, toast, setRoomInfo, showInteraction } from './ui.js?v=20260813b';
-import { gameAudio } from './audio.js?v=20260813b';
+import { init as initUI, render, bindSend, toast, setRoomInfo, showInteraction } from './ui.js?v=20260813c';
+import { gameAudio } from './audio.js?v=20260813c';
 import { VoiceChat } from './voice.js';
 
 const $ = selector => document.querySelector(selector);

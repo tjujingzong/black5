@@ -71,16 +71,4 @@ await save('public/audio/sfx/play.wav', make(0.34, (t, i) => {
   return e * (tone(t, 118) * 0.3 + noise(i) * 0.16 * Math.exp(-t * 8));
 }));
 
-// Wet splat: a short low-frequency impact followed by a soft, quickly fading tail.
-await save('public/audio/sfx/tomato.wav', make(0.46, (t, i) => {
-  const impact = Math.exp(-t * 28) * (tone(t, 94) * 0.65 + tone(t, 173) * 0.22);
-  const pulp = noise(i) * 0.2 * Math.exp(-t * 10);
-  return impact + pulp;
-}));
-// Bucket: a bright rim hit followed by a longer, rippling water stream.
-await save('public/audio/sfx/bucket.wav', make(0.78, (t, i) => {
-  const metal = Math.exp(-t * 32) * tone(t, 1450) * 0.42;
-  const water = noise(i) * (0.12 + 0.08 * Math.sin(2 * Math.PI * 24 * t)) * Math.exp(-t * 2.7);
-  const ripple = tone(t, 520 - t * 170) * 0.12 * Math.exp(-t * 2.2);
-  return metal + water + ripple;
-}));
+// Tomato and bucket use licensed Mixkit recordings; see public/audio/SOURCES.md.
