@@ -250,16 +250,17 @@ input:focus { border-color: var(--gold); }
 .myact { min-height: 23px; margin-bottom: 2px; color: var(--muted); text-align: center; font-size: 11px; }
 .mcard { display: inline-block; margin: 1px; padding: 1px 5px; border-radius: 4px; background: #fff; color: #111; box-shadow: 0 1px 2px rgba(0,0,0,.4); font-size: 11px; font-weight: 700; }
 .hand {
-  display: flex; justify-content: center; align-items: flex-start;
+  --stack-offset: 50px;
+  display: flex; justify-content: center; align-items: flex-end;
   min-height: 166px; padding: 14px 8px 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
 }
 .card-group {
   position: relative; flex: 1 1 34px; width: 70px; min-width: 30px; max-width: 70px;
-  height: calc(100px + (var(--group-size) - 1) * 19px);
+  height: calc(100px + (var(--group-size) - 1) * var(--stack-offset));
 }
 .card-group:last-child { flex: 0 0 70px; min-width: 70px; }
 .card {
-  position: absolute; left: 0; top: calc(var(--card-index) * 19px); z-index: calc(var(--card-index) + 1);
+  position: absolute; left: 0; top: calc((var(--group-size) - 1 - var(--card-index)) * var(--stack-offset)); z-index: calc(var(--group-size) - var(--card-index));
   width: 70px; height: 100px;
   border: 1px solid #8a8a85; border-radius: 7px; background: #fff; color: #111;
   box-shadow: 0 3px 6px rgba(0,0,0,.36); cursor: pointer; user-select: none;
@@ -394,10 +395,10 @@ td.minus { color: #ff9991; font-weight: 800; }
   .self-profile { min-height: 25px; }
   .self-profile .avatar-static { width: 24px; height: 24px; }
   .myact { min-height: 18px; }
-  .hand { width: 100%; min-height: 150px; justify-content: flex-start; padding: 12px 3px 3px; }
-  .card-group { flex-basis: 28px; width: 62px; min-width: 26px; max-width: 62px; height: calc(88px + (var(--group-size) - 1) * 18px); }
+  .hand { width: 100%; min-height: 150px; --stack-offset: 44px; justify-content: flex-start; padding: 12px 3px 3px; }
+  .card-group { flex-basis: 28px; width: 62px; min-width: 26px; max-width: 62px; height: calc(88px + (var(--group-size) - 1) * var(--stack-offset)); }
   .card-group:last-child { flex-basis: 62px; min-width: 62px; }
-  .card { width: 62px; height: 88px; top: calc(var(--card-index) * 18px); }
+  .card { width: 62px; height: 88px; }
   .card .cr { left: 6px; top: 5px; font-size: 17px; }
   .card .cs { left: 6px; top: 30px; font-size: 24px; }
   .controls { grid-template-columns: minmax(64px,.8fr) minmax(70px,.9fr) minmax(94px,1.2fr); gap: 6px; padding: 7px 0 3px; }
