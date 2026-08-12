@@ -11,3 +11,7 @@ The random in-game playlist contains these tracks by Kevin MacLeod:
 - License URL: https://creativecommons.org/licenses/by/4.0/
 
 The tracks are stored locally and played in a shuffled, non-repeating queue.
+
+Files under `sfx/` are locally synthesized game effects. Files under `voice/`
+are locally generated speech clips used to provide reliable playback on mobile
+browsers that do not expose Web Audio or speech synthesis consistently.

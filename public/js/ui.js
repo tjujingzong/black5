@@ -242,9 +242,22 @@ function gameHtml(v) {
       : '<div class="secret"><b>♠5</b> 你是黑五（黑桃5持有者），是庄家的秘密队友，可择机明牌</div>';
   }
 
-  const hand = v.myHand.map(c => `
-    <div class="card${(c.suit === 1 || c.suit === 3) ? ' red' : ''}${selected.has(c.id) ? ' sel' : ''}" data-card="${c.id}">
-      <span class="cr">${rankChar(c.rank)}</span><span class="cs">${SUITS[c.suit]}</span>
+  const groupedHand = [];
+  for (const card of v.myHand) {
+    let group = groupedHand.at(-1);
+    if (!group || group.rank !== card.rank) {
+      group = { rank: card.rank, cards: [] };
+      groupedHand.push(group);
+    }
+    group.cards.push(card);
+  }
+  const hand = groupedHand.map(group => `
+    <div class="card-group" style="--group-size:${group.cards.length}">
+      ${group.cards.map((card, index) => `
+        <div class="card${(card.suit === 1 || card.suit === 3) ? ' red' : ''}${selected.has(card.id) ? ' sel' : ''}"
+             data-card="${card.id}" style="--card-index:${index}" aria-label="${SUITS[card.suit]}${rankChar(card.rank)}">
+          <span class="cr">${rankChar(card.rank)}</span><span class="cs">${SUITS[card.suit]}</span>
+        </div>`).join('')}
     </div>`).join('');
 
   const canPass = myTurn && !!v.pending;
@@ -274,7 +287,7 @@ function gameHtml(v) {
         <span>${esc(me.name)}</span>${me.voice ? '<i class="voice-mark">语音中</i>' : ''}
       </div>
       <div class="myact">${myAct}</div>
-      <div class="hand">${hand}</div>
+      <div class="hand" style="--hand-groups:${groupedHand.length}">${hand}</div>
       <div class="controls">
         <button class="hint-button" data-act="hint" ${myTurn ? '' : 'disabled'}>提示</button>
         <button class="pass-button" data-act="pass" ${canPass ? '' : 'disabled'}>过牌</button>

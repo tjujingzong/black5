@@ -12,6 +12,37 @@ export const MUSIC_TRACKS = [
   { src: '/audio/voxel-revolution.mp3', title: 'Voxel Revolution' },
 ];
 
+export const EFFECT_MEDIA_SOURCES = Object.freeze({
+  click: '/audio/sfx/click.wav',
+  card: '/audio/sfx/card.wav',
+  join: '/audio/sfx/join.wav',
+  ready: '/audio/sfx/ready.wav',
+  play: '/audio/sfx/play.wav',
+  pass: '/audio/sfx/pass.wav',
+  blackFive: '/audio/sfx/black-five.wav',
+  turn: '/audio/sfx/turn.wav',
+  start: '/audio/sfx/start.wav',
+  result: '/audio/sfx/result.wav',
+  error: '/audio/sfx/error.wav',
+  tomato: '/audio/sfx/tomato.wav',
+  bucket: '/audio/sfx/bucket.wav',
+});
+
+export const VOICE_MEDIA_SOURCES = Object.freeze({
+  '心态崩了啊': '/audio/voice/quick-mindset.wav',
+  '一个小单张，不走不健康': '/audio/voice/quick-single.wav',
+  '快点吧，我等得花儿都谢了': '/audio/voice/quick-hurry.wav',
+  pass: '/audio/voice/pass-en.wav',
+  '要不起': '/audio/voice/pass-cannot.wav',
+  '不要': '/audio/voice/pass-no.wav',
+  '黑五现身': '/audio/voice/black-five.wav',
+  '顺子': '/audio/voice/straight.wav',
+  '姊妹对': '/audio/voice/sister-pairs.wav',
+});
+
+const MEDIA_UNLOCK_SOURCE = '/audio/sfx/silence.wav';
+const EFFECT_PLAYER_COUNT = 3;
+
 class GameAudio {
   constructor() {
     const legacyEnabled = localStorage.getItem(LEGACY_AUDIO_KEY) !== '0';
@@ -36,6 +67,12 @@ class GameAudio {
     this.musicQueue = [];
     this.currentTrack = -1;
     this.musicRetry = 0;
+    this.effectPlayers = [];
+    this.effectPlayerIndex = 0;
+    this.voicePlayer = null;
+    this.mediaPrimed = false;
+    this.mediaPrimePromise = null;
+    this.mediaPrimeAttempted = false;
   }
 
   init() {
@@ -50,6 +87,7 @@ class GameAudio {
       this.nextMusic(true);
     });
     this.nextMusic(false);
+    this.setupMediaPlayers();
     this.musicButton = document.getElementById('btn-music');
     this.effectsButton = document.getElementById('btn-effects');
     this.updateButtons();
@@ -78,6 +116,7 @@ class GameAudio {
     if (userGesture) {
       this.userActivated = true;
       this.primeSpeech();
+      this.primeMediaPlayers();
     }
     if (this.effectsEnabled && AudioContextClass && !this.context) {
       this.context = new AudioContextClass();
@@ -97,8 +136,7 @@ class GameAudio {
       ? this.context.resume().catch(() => {})
       : Promise.resolve();
     resumed.then(() => {
-      if (this.context?.state === 'running') this.flushEffects();
-      this.flushSpeech();
+      this.flushPendingAudio();
     });
     if (this.musicEnabled) this.startMusic();
   }
@@ -113,6 +151,52 @@ class GameAudio {
       globalThis.speechSynthesis.speak(primer);
     } catch (e) {
       this.speechPrimed = false;
+    }
+  }
+
+  setupMediaPlayers() {
+    this.effectPlayers = Array.from({ length: EFFECT_PLAYER_COUNT }, () => this.createMediaPlayer());
+    this.voicePlayer = this.createMediaPlayer();
+  }
+
+  createMediaPlayer() {
+    const player = new Audio(MEDIA_UNLOCK_SOURCE);
+    player.preload = 'auto';
+    player.playsInline = true;
+    player.load();
+    return player;
+  }
+
+  primeMediaPlayers() {
+    if (this.mediaPrimed || this.mediaPrimePromise || !this.effectPlayers.length || !this.voicePlayer) {
+      return this.mediaPrimePromise || Promise.resolve();
+    }
+    const players = [...this.effectPlayers, this.voicePlayer];
+    this.mediaPrimeAttempted = true;
+    const attempts = players.map(player => {
+      player.src = MEDIA_UNLOCK_SOURCE;
+      player.currentTime = 0;
+      player.muted = false;
+      player.volume = 0.0001;
+      const started = player.play();
+      return Promise.resolve(started).then(() => {
+        player.pause();
+        player.currentTime = 0;
+        player.volume = 1;
+      });
+    });
+    this.mediaPrimePromise = Promise.allSettled(attempts).then(results => {
+      this.mediaPrimed = results.some(result => result.status === 'fulfilled');
+      this.mediaPrimePromise = null;
+      this.flushPendingAudio();
+    });
+    return this.mediaPrimePromise;
+  }
+
+  flushPendingAudio() {
+    if (this.userActivated) {
+      this.flushEffects();
+      this.flushSpeech();
     }
   }
 
@@ -135,6 +219,8 @@ class GameAudio {
     else {
       this.pendingEffects = [];
       this.pendingSpeech = [];
+      this.effectPlayers.forEach(player => player.pause());
+      this.voicePlayer?.pause();
       globalThis.speechSynthesis?.cancel();
     }
   }
@@ -230,9 +316,52 @@ class GameAudio {
 
   play(name) {
     if (!this.effectsEnabled) return;
+    if (!this.userActivated) {
+      this.queueEffect(name);
+      return;
+    }
+    const source = EFFECT_MEDIA_SOURCES[name];
+    if (source && this.effectPlayers.length) {
+      if (this.mediaPrimePromise) {
+        this.queueEffect(name);
+        return;
+      }
+      if (!this.mediaPrimed && !this.mediaPrimeAttempted) {
+        this.queueEffect(name);
+        this.primeMediaPlayers();
+        return;
+      }
+      if (!this.mediaPrimed) {
+        this.playWebEffect(name);
+        return;
+      }
+      this.playEffectMedia(source, name);
+      return;
+    }
+    this.playWebEffect(name);
+  }
+
+  queueEffect(name) {
+    this.pendingEffects.push(name);
+    if (this.pendingEffects.length > 8) this.pendingEffects.shift();
+  }
+
+  playEffectMedia(source, fallbackName) {
+    const availableIndex = this.effectPlayers.findIndex(player => player.paused || player.ended);
+    const index = availableIndex >= 0 ? availableIndex : this.effectPlayerIndex++ % this.effectPlayers.length;
+    const player = this.effectPlayers[index];
+    player.pause();
+    player.src = source;
+    player.currentTime = 0;
+    player.muted = false;
+    player.volume = 0.9;
+    const started = player.play();
+    if (started?.catch) started.catch(() => this.playWebEffect(fallbackName));
+  }
+
+  playWebEffect(name) {
     if (!this.context || this.context.state !== 'running') {
-      this.pendingEffects.push(name);
-      if (this.pendingEffects.length > 8) this.pendingEffects.shift();
+      this.queueEffect(name);
       if (this.userActivated) this.unlock(false);
       return;
     }
@@ -277,12 +406,49 @@ class GameAudio {
   }
 
   speak(text) {
-    if (!this.effectsEnabled || !text || !globalThis.speechSynthesis || !globalThis.SpeechSynthesisUtterance) return;
+    if (!this.effectsEnabled || !text) return;
     if (!this.userActivated) {
       this.pendingSpeech.push(text);
       if (this.pendingSpeech.length > 6) this.pendingSpeech.shift();
       return;
     }
+    const source = VOICE_MEDIA_SOURCES[text];
+    if (source && this.voicePlayer) {
+      if (this.mediaPrimePromise) {
+        this.pendingSpeech.push(text);
+        if (this.pendingSpeech.length > 6) this.pendingSpeech.shift();
+        return;
+      }
+      if (!this.mediaPrimed) {
+        this.speakWithSystem(text);
+        return;
+      }
+      this.playVoiceMedia(source, text);
+      return;
+    }
+    this.speakWithSystem(text);
+  }
+
+  playVoiceMedia(source, fallbackText) {
+    const player = this.voicePlayer;
+    player.pause();
+    player.src = source;
+    player.currentTime = 0;
+    player.muted = false;
+    player.volume = 1;
+    this.duckMusic();
+    const restore = () => this.restoreMusic();
+    player.onended = restore;
+    player.onerror = restore;
+    const started = player.play();
+    if (started?.catch) started.catch(() => {
+      restore();
+      this.speakWithSystem(fallbackText);
+    });
+  }
+
+  speakWithSystem(text) {
+    if (!globalThis.speechSynthesis || !globalThis.SpeechSynthesisUtterance) return;
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = speechLanguage(text);
     utterance.rate = 1.08;
@@ -295,15 +461,23 @@ class GameAudio {
       || null;
     utterance.onstart = () => {
       this.speechDepth++;
-      if (this.musicEnabled && this.music) this.music.volume = 0.07;
+      this.duckMusic();
     };
     const restore = () => {
       this.speechDepth = Math.max(0, this.speechDepth - 1);
-      if (this.music && this.speechDepth === 0) this.music.volume = MUSIC_VOLUME;
+      if (this.speechDepth === 0) this.restoreMusic();
     };
     utterance.onend = restore;
     utterance.onerror = restore;
     speechSynthesis.speak(utterance);
+  }
+
+  duckMusic() {
+    if (this.musicEnabled && this.music) this.music.volume = 0.055;
+  }
+
+  restoreMusic() {
+    if (this.music) this.music.volume = MUSIC_VOLUME;
   }
 
   flushSpeech() {

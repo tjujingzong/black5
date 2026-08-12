@@ -38,6 +38,7 @@
 *.eot    binary
 *.otf    binary
 *.mp3    binary
+*.wav    binary
 *.mp4    binary
 *.webm   binary
 *.zip    binary

@@ -118,13 +118,16 @@ globalThis.AudioContext = class {
   createBufferSource() { return { connect: () => {}, start: () => {} }; }
   resume() { this.state = 'running'; return Promise.resolve(); }
 };
-const { gameAudio, MUSIC_TRACKS } = await import('./public/js/audio.js');
+const { gameAudio, MUSIC_TRACKS, EFFECT_MEDIA_SOURCES, VOICE_MEDIA_SOURCES } = await import('./public/js/audio.js');
 gameAudio.unlock(true);
 await Promise.resolve();
 ok(gameAudio.context?.state === 'running' && gameAudio.userActivated && gameAudio.speechPrimed,
   '首次触摸会同时解锁移动端 Web Audio 和语音');
 ok(MUSIC_TRACKS.length === 3 && new Set(MUSIC_TRACKS.map(track => track.src)).size === 3,
   '随机 BGM 曲库包含三首不重复的本地音乐');
+ok(EFFECT_MEDIA_SOURCES.play.endsWith('/play.wav') && EFFECT_MEDIA_SOURCES.card.endsWith('/card.wav')
+  && VOICE_MEDIA_SOURCES['快点吧，我等得花儿都谢了'].endsWith('/quick-hurry.wav'),
+  '手机牌局音效和快捷语音均使用本地媒体文件');
 const blackFiveTones = [];
 gameAudio.context = { state: 'running', currentTime: 10 };
 gameAudio.effectGain = {};
