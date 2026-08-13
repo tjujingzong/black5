@@ -93,8 +93,10 @@ for (const rank of [15, 3, 4, 5]) {
   ok(comboSpeech({ kind: 'single', rank }) === ({ 15: '2', 3: '3', 4: '4', 5: '5' })[rank], `单张 ${rank === 15 ? 2 : rank} 点数播报`);
 }
 ok(comboSpeech({ kind: 'single', rank: 11 }) === '勾', 'J 点数播报为勾');
+ok(comboSpeech({ kind: 'single', rank: 12 }) === '圈', 'Q 点数播报为圈');
 ok(comboSpeech({ kind: 'single', rank: 14 }) === '尖', 'A 点数播报为尖');
 ok(comboSpeech({ kind: 'pair', rank: 14 }) === '对尖', '对子 A 播报为对尖');
+ok(comboSpeech({ kind: 'pair', rank: 12 }) === '对圈', '对子 Q 播报为对圈');
 ok(comboSpeech({ kind: 'straight', rank: 14 }) === '顺子', '顺子牌型播报');
 ok(comboSpeech({ kind: 'pairs', rank: 13 }) === '姊妹对', '姊妹对牌型播报');
 ok(comboSpeech({ kind: 'triple', rank: 9 }) === '三个9，炸弹', '三张炸弹播报');

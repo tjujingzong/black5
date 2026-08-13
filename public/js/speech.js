@@ -2,6 +2,7 @@ import { rankChar } from './cards.js';
 
 function spokenRank(rank) {
   if (rank === 11) return '勾';
+  if (rank === 12) return '圈';
   if (rank === 14) return '尖';
   return rankChar(rank);
 }
