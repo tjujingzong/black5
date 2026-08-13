@@ -17,6 +17,7 @@ ok(classify([C(9, 0), C(9, 1)]).kind === 'pair', '对子');
 ok(classify([C(9, 0), C(9, 1), C(9, 2)]).kind === 'triple', '三张=炸弹');
 ok(classify([C(9, 0), C(9, 1), C(9, 2), C(9, 3)]).kind === 'quad', '四张=轰牌');
 ok(classify([C(15), C(3), C(4)]).kind === 'straight', '2-3-4 是最小顺子');
+ok(classify([C(14), C(15), C(3)]).kind === 'straight', 'A-2-3 是特殊顺子');
 ok(classify([C(3), C(4), C(5)]).kind === 'straight', '3-4-5 顺子合法');
 ok(classify([C(3), C(4), C(6)]).kind === 'straight', '3-4-6 顺子合法');
 ok(classify([C(4), C(5), C(6)]).kind === 'straight', '4-5-6 顺子合法');
