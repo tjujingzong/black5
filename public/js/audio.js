@@ -5,6 +5,7 @@ const LEGACY_AUDIO_KEY = 'jh5-audio-enabled';
 const MUSIC_KEY = 'jh5-music-enabled';
 const EFFECTS_KEY = 'jh5-effects-enabled';
 const MUSIC_VOLUME = 0.18;
+const TURN_REMINDER_DELAY_MS = 8000;
 
 export const MUSIC_TRACKS = [
   { src: '/audio/bassa-island-game-loop.mp3', title: 'Bassa Island Game Loop' },
@@ -75,6 +76,8 @@ class GameAudio {
     this.mediaPrimed = false;
     this.mediaPrimePromise = null;
     this.mediaPrimeAttempted = false;
+    this.turnReminderTimer = null;
+    this.turnReminderKey = '';
   }
 
   init() {
@@ -497,6 +500,37 @@ class GameAudio {
     for (const text of pending) this.speak(text);
   }
 
+  syncTurnReminder(view, next) {
+    const isMyTurn = next.phase === 'playing' && next.turn === next.mine;
+    const startedAt = Number(view.turnStartedAt);
+    const key = isMyTurn && Number.isFinite(startedAt)
+      ? `${next.round}:${next.mine}:${startedAt}`
+      : '';
+    if (!key) {
+      this.cancelTurnReminder();
+      return;
+    }
+    if (key === this.turnReminderKey) return;
+    this.cancelTurnReminder();
+    this.turnReminderKey = key;
+    const serverNow = Number.isFinite(view.serverNow) ? view.serverNow : Date.now();
+    const remaining = Math.max(0, TURN_REMINDER_DELAY_MS - (serverNow - startedAt));
+    this.turnReminderTimer = setTimeout(() => {
+      this.turnReminderTimer = null;
+      const current = this.lastState;
+      if (this.turnReminderKey === key && current?.phase === 'playing'
+        && current.turn === current.mine && current.turnStartedAt === startedAt) {
+        this.speak('轮到你出牌');
+      }
+    }, remaining);
+  }
+
+  cancelTurnReminder() {
+    clearTimeout(this.turnReminderTimer);
+    this.turnReminderTimer = null;
+    this.turnReminderKey = '';
+  }
+
   observe(view) {
     const next = {
       phase: view.phase,
@@ -505,6 +539,7 @@ class GameAudio {
       ready: view.players.filter(player => player.ready).length,
       turn: view.turnSeat,
       mine: view.mySeat,
+      turnStartedAt: Number(view.turnStartedAt),
       pending: view.pending
         ? `${view.pending.seat}:${view.pending.cards.map(card => card.id).join(',')}`
         : '',
@@ -518,6 +553,7 @@ class GameAudio {
     };
     const previous = this.lastState;
     this.lastState = next;
+    this.syncTurnReminder(view, next);
     if (!previous) return;
     const action = next.audioId > previous.audioId ? next.audioEvent : null;
     if (action?.type === 'play') {
@@ -536,7 +572,6 @@ class GameAudio {
     }
     if (previous.turn !== next.turn && next.turn === next.mine && next.phase === 'playing') {
       this.play('turn');
-      this.speak('轮到你出牌');
     }
     if (previous.phase !== 'roundEnd' && next.phase === 'roundEnd') this.play('result');
     else if (previous.phase !== 'playing' && next.phase === 'playing') this.play('start');

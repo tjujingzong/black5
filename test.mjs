@@ -168,6 +168,7 @@ gameAudio.speak = text => spoken.push(text);
 gameAudio.announce = combo => audioCalls.push(`announce:${combo.kind}`);
 const audioView = {
   phase: 'playing', round: 1, players: [], turnSeat: 0, mySeat: 0,
+  turnStartedAt: Date.now(), serverNow: Date.now(),
   pending: null, chat: [], lastInteraction: null, audioEvent: null,
 };
 gameAudio.lastState = null;
@@ -180,6 +181,10 @@ gameAudio.observe({
 ok(audioCalls.filter(name => name === 'blackFive').length === 2
   && spoken.filter(text => text === '黑五现身').length === 2,
   '自爆黑五与打出黑桃5都会触发专属音效和语音');
+ok(!spoken.includes('轮到你出牌') && gameAudio.turnReminderTimer,
+  '轮到自己时不会立即语音提醒，而是建立 8 秒延迟提醒');
+gameAudio.observe({ ...audioView, turnSeat: 1, turnStartedAt: Date.now() + 1, serverNow: Date.now() });
+ok(!gameAudio.turnReminderTimer, '8 秒内完成操作并切换回合会取消语音提醒');
 
 console.log('== 计分与人机 ==');
 // 平局：庄家阵营一头科一大落，名次分相抵
