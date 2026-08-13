@@ -149,6 +149,9 @@ export class Room {
       this.broadcastVoiceChunk(attachment.playerId, data);
       return;
     }
+    // Compatibility with a briefly cached Worker version: old clients may send
+    // the first voice packet before the new asset is refreshed.
+    if (data && data.t === 'voiceSignal') return;
 
     if (this.game.timeoutTurn()) {
       await this.persist();

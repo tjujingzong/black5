@@ -83,8 +83,13 @@ export class RoomNet {
 
   send(message) {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN || !this.joined) return false;
-    this.ws.send(JSON.stringify(message));
-    return true;
+    try {
+      this.ws.send(JSON.stringify(message));
+      return true;
+    } catch (error) {
+      this.h.onError(`语音数据发送失败（${error?.name || 'UnknownError'}）`);
+      return false;
+    }
   }
 
   destroy() {

@@ -32,7 +32,9 @@ const voiceChat = new VoiceChat({
   onError: message => toast(message),
 });
 
-$('#btn-voice').addEventListener('click', () => voiceChat.toggle());
+$('#btn-voice').addEventListener('click', () => voiceChat.toggle().catch(error => {
+  toast(`语音启动失败（${error?.name || 'UnknownError'}）`);
+}));
 
 function setSender(fn) {
   bindSend(fn);

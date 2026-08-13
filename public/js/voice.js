@@ -31,21 +31,45 @@ export class VoiceChat {
   }
 
   async toggle() {
-    if (this.enabled) this.disable();
-    else await this.enable();
+    try {
+      if (this.enabled) this.disable();
+      else await this.enable();
+    } catch (error) {
+      this.stopRecorder();
+      for (const track of this.stream?.getTracks() || []) track.stop();
+      this.stream = null;
+      this.enabled = false;
+      this.onState({ enabled: false, busy: false });
+      this.onError(`语音启动失败（${error?.name || 'UnknownError'}），请确认网页已允许麦克风权限`);
+    }
   }
 
   async enable() {
-    if (!navigator.mediaDevices?.getUserMedia || !globalThis.MediaRecorder) {
-      this.onError('当前浏览器不支持实时语音');
+    if (!globalThis.isSecureContext) {
+      this.onError('语音需要 HTTPS 页面，请使用 Cloudflare 的 https 地址');
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.onError('当前浏览器未提供麦克风权限接口，请检查系统权限和浏览器设置');
+      return;
+    }
+    if (!globalThis.MediaRecorder) {
+      this.onError('当前浏览器不支持录音编码，请更新浏览器后重试');
       return;
     }
     try {
       this.onState({ enabled: false, busy: true });
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: false,
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
-      });
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+        });
+      } catch (error) {
+        // Some iOS builds reject advanced constraints; retry with the minimum request.
+        if (error?.name === 'OverconstrainedError' || error?.name === 'NotReadableError' || error?.name === 'UnknownError') {
+          this.stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        } else throw error;
+      }
       this.enabled = true;
       this.onState({ enabled: true, busy: false });
       if (this.connected) {
@@ -54,7 +78,15 @@ export class VoiceChat {
       }
     } catch (error) {
       this.onState({ enabled: false, busy: false });
-      this.onError(error?.name === 'NotAllowedError' ? '未获得麦克风权限' : '无法开启麦克风');
+      const labels = {
+        NotAllowedError: '未获得麦克风权限，请在浏览器设置中允许麦克风',
+        NotFoundError: '没有找到可用的麦克风设备',
+        NotReadableError: '麦克风正被其他应用占用',
+        SecurityError: '浏览器安全策略阻止了麦克风',
+        OverconstrainedError: '当前麦克风不支持游戏所需参数',
+        UnknownError: '浏览器返回未知错误，请关闭其他占用麦克风的应用后重试',
+      };
+      this.onError(labels[error?.name] || `无法开启麦克风（${error?.name || 'UnknownError'}）`);
     }
   }
 
@@ -101,7 +133,10 @@ export class VoiceChat {
 
   recordNextSlice() {
     if (!this.enabled || !this.connected || !this.stream || this.recorder) return;
-    const mimeType = MIME_TYPES.find(type => MediaRecorder.isTypeSupported?.(type)) || '';
+    const mimeType = MIME_TYPES.find(type => {
+      try { return MediaRecorder.isTypeSupported ? MediaRecorder.isTypeSupported(type) : false; }
+      catch (error) { return false; }
+    }) || '';
     try {
       const recorder = new MediaRecorder(this.stream, {
         ...(mimeType ? { mimeType } : {}),
@@ -111,6 +146,10 @@ export class VoiceChat {
       this.recorder = recorder;
       recorder.addEventListener('dataavailable', event => {
         if (event.data?.size) chunks.push(event.data);
+      });
+      recorder.addEventListener('error', event => {
+        this.onError(`录音器发生错误（${event.error?.name || 'UnknownError'}），请重新点击语音`);
+        this.stopRecorder();
       });
       recorder.addEventListener('stop', async () => {
         if (this.recorder === recorder) this.recorder = null;
@@ -127,14 +166,14 @@ export class VoiceChat {
         }
         if (this.enabled && this.connected) this.recordNextSlice();
       });
-      recorder.start();
+      recorder.start(250);
       this.sliceTimer = setTimeout(() => {
         this.sliceTimer = null;
         if (recorder.state === 'recording') recorder.stop();
       }, SLICE_MS);
     } catch (error) {
       this.recorder = null;
-      this.onError('语音编码启动失败，请重新打开麦克风');
+      this.onError(`语音编码启动失败（${error?.name || 'UnknownError'}），当前浏览器可能不支持网页录音`);
       this.disable();
     }
   }
