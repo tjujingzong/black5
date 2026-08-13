@@ -64,8 +64,8 @@ export class RoomNet {
         this.h.onWelcome(data);
       } else if (data.t === 'state') {
         this.h.onState(data.view);
-      } else if (data.t === 'voiceSignal') {
-        this.h.onVoiceSignal(data);
+      } else if (data.t === 'voiceChunk') {
+        this.h.onVoiceChunk(data);
       } else if (data.t === 'err') {
         if (!this.joined) this.rejected = true;
         this.h.onError(data.msg || '服务器拒绝了请求');

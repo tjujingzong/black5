@@ -378,7 +378,10 @@ export class Game {
   // 出牌/过牌之后推进回合
   afterAction() {
     const active = this.players.filter(p => p.outRank === null).length;
-    if (active <= 1) { this.finishRound(); return; }
+    const teamA = new Set(this.teamSeats());
+    const teamAComplete = this.players.every((player, seat) => !teamA.has(seat) || player.outRank !== null);
+    const teamBComplete = this.players.every((player, seat) => teamA.has(seat) || player.outRank !== null);
+    if (active <= 1 || teamAComplete || teamBComplete) { this.finishRound(); return; }
     if (this.pending) {
       const holderOut = this.players[this.pending.seat].outRank !== null;
       // 除最后出牌者外全部过牌 → 本圈结束
@@ -417,17 +420,22 @@ export class Game {
 
   finishRound() {
     const n = this.players.length;
-    const left = this.players.find(p => p.outRank === null);
-    if (left) { left.outRank = ++this.rankCount; }
+    // An entire team finishing is enough to end the hand. Give the remaining
+    // players stable finishing positions before calculating the settlement.
+    for (const player of this.players) {
+      if (player.outRank === null) player.outRank = ++this.rankCount;
+    }
     const teamA = this.teamSeats();
     // 名次基础分：5 人局为 头科+10 / 二科+5 / 三科0 / 四科-5 / 大落-10，其他人数等差展开
     const posPts = pos => (n - 1 - 2 * (pos - 1)) * 5;
     const sumA = teamA.reduce((s, seat) => s + posPts(this.players[seat].outRank), 0);
     const zeroRound = sumA === 0; // 双方名次分相抵为平局（如一头科一大落），否则按名次结算
     const mult = this.solo ? 2 : 1;
+    const teamACount = teamA.length;
+    const teamBCount = n - teamACount;
     const rows = this.players.map((p, i) => {
       const inA = teamA.includes(i);
-      const delta = zeroRound ? 0 : (inA ? sumA : -sumA) * mult;
+      const delta = zeroRound ? 0 : (inA ? sumA * teamBCount : -sumA * teamACount) * mult;
       p.score += delta;
       return { name: p.name, pos: p.outRank, posName: posName(p.outRank, n), team: inA ? '庄家' : '闲家', delta, score: p.score };
     }).sort((a, b) => a.pos - b.pos);

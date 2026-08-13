@@ -230,6 +230,43 @@ scoredGame.rankCount = 4;
 scoredGame.phase = 'playing';
 scoredGame.finishRound();
 ok(!scoredGame.result.zeroRound && scoredGame.result.rows.some(row => row.delta !== 0), '庄家大落时按名次正常计分');
+ok(scoredGame.result.rows.reduce((sum, row) => sum + row.delta, 0) === 0, '四人局每局加减分总和严格为 0');
+
+const earlyDealerGame = new Game();
+earlyDealerGame.players = [
+  { id: 'd', name: '庄家', hand: [], outRank: 1, score: 0 },
+  { id: 'b', name: '黑五', hand: [], outRank: 2, score: 0 },
+  { id: 'x', name: '闲家甲', hand: [C(6)], outRank: null, score: 0 },
+  { id: 'y', name: '闲家乙', hand: [C(7)], outRank: null, score: 0 },
+];
+earlyDealerGame.dealer = 0;
+earlyDealerGame.blackFiveSeat = 1;
+earlyDealerGame.solo = false;
+earlyDealerGame.winTeam = 'A';
+earlyDealerGame.rankCount = 2;
+earlyDealerGame.phase = 'playing';
+earlyDealerGame.afterAction();
+ok(earlyDealerGame.phase === 'roundEnd'
+  && earlyDealerGame.players.every(player => player.outRank !== null), '庄家和黑五全部出完后立即结束并补齐名次');
+ok(earlyDealerGame.result.rows.reduce((sum, row) => sum + row.delta, 0) === 0, '庄家阵营提前结束仍严格零和');
+
+const earlyIdleGame = new Game();
+earlyIdleGame.players = [
+  { id: 'd', name: '庄家', hand: [C(6)], outRank: null, score: 0 },
+  { id: 'b', name: '黑五', hand: [C(7)], outRank: null, score: 0 },
+  { id: 'x', name: '闲家甲', hand: [], outRank: 1, score: 0 },
+  { id: 'y', name: '闲家乙', hand: [], outRank: 2, score: 0 },
+];
+earlyIdleGame.dealer = 0;
+earlyIdleGame.blackFiveSeat = 1;
+earlyIdleGame.solo = false;
+earlyIdleGame.winTeam = 'B';
+earlyIdleGame.rankCount = 2;
+earlyIdleGame.phase = 'playing';
+earlyIdleGame.afterAction();
+ok(earlyIdleGame.phase === 'roundEnd'
+  && earlyIdleGame.players.every(player => player.outRank !== null), '闲家全部出完后立即结束并补齐名次');
+ok(earlyIdleGame.result.rows.reduce((sum, row) => sum + row.delta, 0) === 0, '闲家阵营提前结束仍严格零和');
 
 const botGame = new Game();
 const hostId = botGame.join('测试员').player.id;
@@ -361,7 +398,8 @@ for (let t = 0; t < 20; t++) {
   const deltas = g.result.rows.map(r => r.delta);
   const dA = g.result.rows.filter(r => r.team === '庄家').map(r => r.delta);
   const dB = g.result.rows.filter(r => r.team === '闲家').map(r => r.delta);
-  ok(new Set(dA).size === 1 && new Set(dB).size === 1 && dA[0] === -dB[0], `阵营对抗计分对称（庄 ${dA[0]} / 闲 ${dB[0]}）`);
+  ok(deltas.reduce((sum, value) => sum + value, 0) === 0,
+    `全员结算严格零和（庄 ${dA.reduce((a, b) => a + b, 0)} / 闲 ${dB.reduce((a, b) => a + b, 0)}）`);
   ok(g.winTeam === 'A' || g.winTeam === 'B', '胜负阵营已判定');
 
   // 下一局庄家轮替

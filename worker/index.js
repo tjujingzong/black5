@@ -3,7 +3,7 @@ import { Game } from '../public/js/engine.js';
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 5;
 const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
-const MAX_MESSAGE_LENGTH = 16 * 1024;
+const MAX_MESSAGE_LENGTH = 64 * 1024;
 const BOT_DELAY_MS = 650;
 
 function json(data, status = 200) {
@@ -84,6 +84,7 @@ export class Room {
     this.state = state;
     this.game = null;
     this.botRunning = false;
+    this.voiceChunkAt = new Map();
     state.blockConcurrencyWhile(async () => {
       const [saved, expiresAt] = await Promise.all([
         state.storage.get('game'),
@@ -144,8 +145,8 @@ export class Room {
       this.reject(ws, '房间已失效', 4004);
       return;
     }
-    if (data && data.t === 'voiceSignal') {
-      this.forwardVoiceSignal(attachment.playerId, data);
+    if (data && data.t === 'voiceChunk') {
+      this.broadcastVoiceChunk(attachment.playerId, data);
       return;
     }
 
@@ -230,23 +231,20 @@ export class Room {
     }
   }
 
-  forwardVoiceSignal(fromId, data) {
+  broadcastVoiceChunk(fromId, data) {
     const from = this.game.players.find(player => player.id === fromId);
-    const to = this.game.players.find(player => player.publicId === data.to);
-    const kinds = ['offer', 'answer', 'ice'];
-    if (!from || !to || from.isBot || to.isBot || !kinds.includes(data.kind) || !data.data) return;
-    // Offers and their ICE candidates originate from the person broadcasting a microphone.
-    // Answers and their ICE candidates return to that broadcaster from listen-only peers.
-    const validDirection = data.kind === 'offer'
-      ? from.voice
-      : data.kind === 'answer'
-        ? to.voice
-        : from.voice || to.voice;
-    if (!validDirection) return;
+    const mime = String(data.mime || '').slice(0, 64);
+    const payload = String(data.data || '');
+    const now = Date.now();
+    const lastChunkAt = this.voiceChunkAt.get(fromId) || 0;
+    if (!from || from.isBot || !from.voice || !/^audio\/(webm|mp4|ogg)/.test(mime)
+      || !payload || payload.length > 56 * 1024 || !/^[A-Za-z0-9+/]+=*$/.test(payload)
+      || now - lastChunkAt < 400) return;
+    this.voiceChunkAt.set(fromId, now);
     for (const ws of this.state.getWebSockets()) {
       const { playerId } = ws.deserializeAttachment() || {};
-      if (playerId === to.id) {
-        this.send(ws, { t: 'voiceSignal', from: from.publicId, kind: data.kind, data: data.data });
+      if (playerId && playerId !== fromId) {
+        this.send(ws, { t: 'voiceChunk', from: from.publicId, mime, data: payload, seq: Number(data.seq) || 0 });
       }
     }
   }
