@@ -1,8 +1,8 @@
 // 入口：首页交互 + 房间实时连接装配。
-import { createRoom, RoomNet } from './net.js?v=20260813h';
-import { init as initUI, render, bindSend, toast, setRoomInfo, showInteraction } from './ui.js?v=20260813h';
-import { gameAudio } from './audio.js?v=20260813h';
-import { VoiceChat } from './voice.js?v=20260813h';
+import { createRoom, RoomNet } from './net.js?v=20260813i';
+import { init as initUI, render, bindSend, toast, setRoomInfo, showInteraction } from './ui.js?v=20260813i';
+import { gameAudio } from './audio.js?v=20260813i';
+import { VoiceChat } from './voice.js?v=20260813i';
 
 const $ = selector => document.querySelector(selector);
 initUI();
@@ -73,6 +73,7 @@ function connectRoom(code, name, token) {
       retryCount = 0;
       currentRoom.token = data.token;
       sessionStorage.setItem('jh5-token-' + code, data.token);
+      localStorage.setItem('jh5-token-' + code, data.token);
       setSender(message => {
         if (!net.send(message)) toast('连接尚未恢复，请稍后再试');
       });
@@ -105,18 +106,18 @@ function connectRoom(code, name, token) {
         resetHomeButtons();
         return;
       }
-      if (retryCount >= 3) {
+      if (retryCount >= 10) {
         toast('重连失败，请刷新页面重新加入');
         resetHomeButtons();
         return;
       }
       retryCount++;
-      toast(`连接断开，正在重连（${retryCount}/3）…`);
+      toast(`连接断开，正在重连（${retryCount}/10）…`);
       setTimeout(() => {
         if (roomNet === net && currentRoom) {
           connectRoom(currentRoom.code, currentRoom.name, currentRoom.token);
         }
-      }, 1000);
+      }, Math.min(5000, 700 + retryCount * 500));
     },
   });
   roomNet = net;
@@ -147,7 +148,8 @@ $('#btn-join').addEventListener('click', () => {
     return toast('请输入正确的 5 位房间号');
   }
   sessionStorage.setItem('jh5-name', name);
-  const token = sessionStorage.getItem('jh5-token-' + code) || null;
+  const token = sessionStorage.getItem('jh5-token-' + code)
+    || localStorage.getItem('jh5-token-' + code) || null;
   retryCount = 0;
   setJoinBusy(true, '连接中…');
   connectRoom(code, name, token);

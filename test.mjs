@@ -300,6 +300,21 @@ ok(botGame.handleMsg(hostId, { t: 'start' }) === null, '一名真人加两名人
 ok(new Set(botGame.players.map(player => player.avatar)).size === botGame.players.length
   && botGame.players.every(player => AVATAR_IDS.includes(player.avatar)), '每局为玩家分配不重复的素材头像');
 ok(botGame.viewFor(hostId).players.every(player => AVATAR_IDS.includes(player.avatar)), '头像编号同步到玩家视图');
+const reconnectGame = new Game();
+const reconnectPlayer = reconnectGame.join('掉线玩家').player;
+reconnectGame.phase = 'playing';
+reconnectPlayer.hand = [C(6), C(7)];
+reconnectGame.handleDisconnect(reconnectPlayer.id);
+const rejoined = reconnectGame.join('同名新玩家', reconnectPlayer.id).player;
+ok(rejoined === reconnectPlayer && rejoined.connected && rejoined.hand.length === 2
+  && reconnectGame.players.length === 1, '对局中断线玩家凭令牌恢复原座位和手牌');
+const botLeadGame = new Game();
+const botLead = botLeadGame.join('人机测试').player;
+botLeadGame.players.push({ id: 'bot', publicId: 'bot-public', name: '电脑1', hand: [C(6, 0), C(6, 1), C(7, 0), C(7, 1)], outRank: null, score: 0, isBot: true, connected: true, voice: false });
+botLeadGame.phase = 'playing';
+botLeadGame.turn = 1;
+const botLeadHint = botLeadGame.findBotLead(botLeadGame.players[1].hand);
+ok(botLeadHint?.length === 4, '人机首出优先一次打出更大的合法组合');
 let botSteps = 0;
 while (botGame.phase === 'playing' && botSteps < 5000) {
   const player = botGame.players[botGame.turn];

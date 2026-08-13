@@ -4,7 +4,7 @@ const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 5;
 const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_MESSAGE_LENGTH = 64 * 1024;
-const BOT_DELAY_MS = 650;
+const BOT_DELAY_MS = 1000;
 
 function json(data, status = 200) {
   return Response.json(data, {

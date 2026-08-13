@@ -4,7 +4,7 @@
 // - 黑桃5 持有者为庄家的秘密队友（黑五）；庄家自持黑桃5 为独庄
 // - 头科（第一个出完）所在阵营获胜，之后继续决出全部名次用于计分
 
-import { makeDeck, shuffle, sortHand, cardLabel, BLACK5_ID } from './cards.js';
+import { makeDeck, shuffle, sortHand, cardLabel, BLACK5_ID, rankStrength } from './cards.js';
 import { classify, canBeat, comboName, posName, findHint } from './rules.js';
 
 export const MIN_PLAYERS = 3;
@@ -359,9 +359,36 @@ export class Game {
     if (this.phase !== 'playing') return false;
     const p = this.players[this.turn];
     if (!p || !p.isBot) return false;
-    const hint = findHint(p.hand, this.pending ? this.pending.combo : null);
+    const hint = this.pending ? findHint(p.hand, this.pending.combo) : this.findBotLead(p.hand);
     const error = hint ? this.play(p.id, hint.map(card => card.id)) : this.pass(p.id);
     return error ? false : true;
+  }
+
+  findBotLead(hand) {
+    if (!hand.length) return null;
+    const candidates = [];
+    const maxSize = Math.min(6, hand.length);
+    // Enumerate small legal combinations so a bot can shed pairs, straights and
+    // sister pairs instead of always leading a single low card.
+    const visit = (start, chosen) => {
+      if (chosen.length >= 2) {
+        const combo = classify(chosen);
+        if (combo && combo.kind !== 'triple' && combo.kind !== 'quad') {
+          candidates.push({ cards: [...chosen], combo });
+        }
+      }
+      if (chosen.length >= maxSize) return;
+      for (let i = start; i < hand.length; i++) {
+        chosen.push(hand[i]);
+        visit(i + 1, chosen);
+        chosen.pop();
+      }
+    };
+    visit(0, []);
+    candidates.sort((a, b) => b.cards.length - a.cards.length
+      || rankStrength(a.combo.rank) - rankStrength(b.combo.rank)
+      || a.combo.kind.localeCompare(b.combo.kind));
+    return candidates[0]?.cards || findHint(hand, null);
   }
 
   reveal(id) {
